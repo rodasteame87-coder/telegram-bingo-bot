@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0"
@@ -68,8 +69,8 @@
     }
 
     .called {
-      background: #4caf50;
-      color: white;
+      background: #4caf50 !important;
+      color: white !important;
     }
 
     #error {
@@ -127,6 +128,7 @@
       document.getElementById("error");
 
     async function loadCard() {
+
       if (!user) {
         errorElement.textContent =
           "❌ Please open the Mini App from Telegram.";
@@ -144,6 +146,7 @@
       }
 
       try {
+
         const response = await fetch(
           `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(user.id)}`
         );
@@ -170,6 +173,7 @@
         }
 
       } catch (error) {
+
         errorElement.textContent =
           "❌ " + error.message;
 
@@ -178,15 +182,18 @@
     }
 
     function drawCard(card, calledNumbers) {
+
       cardElement.innerHTML = "";
 
       for (let row = 0; row < 5; row++) {
+
         const rowElement =
           document.createElement("div");
 
         rowElement.className = "row";
 
         for (let column = 0; column < 5; column++) {
+
           const cell =
             document.createElement("div");
 
@@ -197,14 +204,22 @@
           cell.textContent = value;
 
           if (value === "FREE") {
-            cell.classList.add("free");
-          }
 
-          if (
-            value !== "FREE" &&
-            calledNumbers.includes(value)
-          ) {
-            cell.classList.add("called");
+            cell.classList.add("free");
+
+          } else {
+
+            const number =
+              Number(value);
+
+            if (
+              calledNumbers.some(
+                n => Number(n) === number
+              )
+            ) {
+              cell.classList.add("called");
+            }
+
           }
 
           rowElement.appendChild(cell);
@@ -215,6 +230,7 @@
     }
 
     loadCard();
+
   </script>
 
 </body>
