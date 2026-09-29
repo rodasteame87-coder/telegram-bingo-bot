@@ -19,10 +19,7 @@ bot.start((ctx) => {
 });
 
 bot.command("bingo", (ctx) => {
-  ctx.reply(
-    "🎉 Bingo game started!\n\n" +
-    "More Bingo features are coming next."
-  );
+  ctx.reply("🎉 Bingo game started!");
 });
 
 bot.command("help", (ctx) => {
@@ -34,15 +31,17 @@ bot.command("help", (ctx) => {
   );
 });
 
+// HTTP server for Render
 const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end("Bingo bot is running!");
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`🌐 Web server running on port ${PORT}`);
 });
 
+// Start Telegram bot
 bot.launch();
 
 console.log("🎱 Bingo bot is running!");
