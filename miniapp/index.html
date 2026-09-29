@@ -43,6 +43,30 @@
       color: #555;
     }
 
+    .game-info {
+      background: white;
+      border-radius: 15px;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.10);
+      text-align: left;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 2px;
+      font-size: 15px;
+    }
+
+    .info-label {
+      color: #777;
+    }
+
+    .info-value {
+      font-weight: bold;
+    }
+
     .last-called {
       background: white;
       border-radius: 18px;
@@ -115,21 +139,18 @@
       user-select: none;
     }
 
-    /* Called number = WHITE */
     .cell.called {
       background: white;
       color: #222;
       border: 2px solid #35c759;
     }
 
-    /* Player mark = GREEN */
     .cell.marked {
       background: #35c759;
       color: white;
       border: 2px solid #35c759;
     }
 
-    /* FREE space = YELLOW */
     .cell.free {
       background: #ffcc00;
       color: #111;
@@ -230,6 +251,56 @@
     <div id="playerName">
       Loading player...
     </div>
+
+    <div class="game-info">
+
+      <div class="info-row">
+
+        <span class="info-label">
+          👑 Host
+        </span>
+
+        <span
+          class="info-value"
+          id="hostName"
+        >
+          Loading...
+        </span>
+
+      </div>
+
+      <div class="info-row">
+
+        <span class="info-label">
+          👥 Players
+        </span>
+
+        <span
+          class="info-value"
+          id="playerCount"
+        >
+          0
+        </span>
+
+      </div>
+
+      <div class="info-row">
+
+        <span class="info-label">
+          🎱 Numbers called
+        </span>
+
+        <span
+          class="info-value"
+          id="calledCount"
+        >
+          0/75
+        </span>
+
+      </div>
+
+    </div>
+
 
     <div class="last-called">
 
@@ -395,6 +466,25 @@
           "playerName"
         ).innerText =
           "👤 " + data.name;
+
+
+        document.getElementById(
+          "hostName"
+        ).innerText =
+          data.hostName || "Unknown";
+
+
+        document.getElementById(
+          "playerCount"
+        ).innerText =
+          data.playerCount || 0;
+
+
+        document.getElementById(
+          "calledCount"
+        ).innerText =
+          calledNumbers.length +
+          "/75";
 
 
         document.getElementById(
