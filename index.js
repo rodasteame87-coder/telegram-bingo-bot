@@ -12,12 +12,7 @@ if (!BOT_TOKEN) {
 }
 
 const bot = new Telegraf(BOT_TOKEN);
-
 const games = new Map();
-
-// ==============================
-// CREATE BINGO CARD
-// ==============================
 
 function createBingoCard() {
   const ranges = [
@@ -52,19 +47,13 @@ function createBingoCard() {
     }
   }
 
-  // Free center space
   card[2][2] = "FREE";
 
   return card;
 }
 
-// ==============================
-// FORMAT BINGO CARD
-// ==============================
-
 function formatCard(card) {
   let text = "🎟️ YOUR BINGO CARD\n\n";
-
   text += " B    I    N    G    O\n";
   text += "----------------------\n";
 
@@ -79,10 +68,6 @@ function formatCard(card) {
   return text;
 }
 
-// ==============================
-// GET BINGO LETTER
-// ==============================
-
 function getLetter(number) {
   if (number <= 15) return "B";
   if (number <= 30) return "I";
@@ -91,10 +76,6 @@ function getLetter(number) {
   return "O";
 }
 
-// ==============================
-// CHECK BINGO
-// ==============================
-
 function hasBingo(card, calledNumbers) {
   const called = new Set(calledNumbers);
 
@@ -102,7 +83,6 @@ function hasBingo(card, calledNumbers) {
     return value === "FREE" || called.has(value);
   }
 
-  // Rows
   for (let row = 0; row < 5; row++) {
     let complete = true;
 
@@ -113,12 +93,9 @@ function hasBingo(card, calledNumbers) {
       }
     }
 
-    if (complete) {
-      return true;
-    }
+    if (complete) return true;
   }
 
-  // Columns
   for (let column = 0; column < 5; column++) {
     let complete = true;
 
@@ -129,12 +106,9 @@ function hasBingo(card, calledNumbers) {
       }
     }
 
-    if (complete) {
-      return true;
-    }
+    if (complete) return true;
   }
 
-  // Diagonal 1
   let diagonal1 = true;
 
   for (let i = 0; i < 5; i++) {
@@ -144,11 +118,8 @@ function hasBingo(card, calledNumbers) {
     }
   }
 
-  if (diagonal1) {
-    return true;
-  }
+  if (diagonal1) return true;
 
-  // Diagonal 2
   let diagonal2 = true;
 
   for (let i = 0; i < 5; i++) {
@@ -160,10 +131,6 @@ function hasBingo(card, calledNumbers) {
 
   return diagonal2;
 }
-
-// ==============================
-// /START
-// ==============================
 
 bot.start((ctx) => {
   ctx.reply(
@@ -178,10 +145,6 @@ bot.start((ctx) => {
     "/help - Show help"
   );
 });
-
-// ==============================
-// /NEWGAME
-// ==============================
 
 bot.command("newgame", (ctx) => {
   const chatId = ctx.chat.id;
@@ -204,10 +167,6 @@ bot.command("newgame", (ctx) => {
     `Players can now use /join`
   );
 });
-
-// ==============================
-// /JOIN
-// ==============================
 
 bot.command("join", (ctx) => {
   const chatId = ctx.chat.id;
@@ -246,10 +205,6 @@ bot.command("join", (ctx) => {
   );
 });
 
-// ==============================
-// /PLAYERS
-// ==============================
-
 bot.command("players", (ctx) => {
   const chatId = ctx.chat.id;
   const game = games.get(chatId);
@@ -276,10 +231,6 @@ bot.command("players", (ctx) => {
 
   ctx.reply(text);
 });
-
-// ==============================
-// /CALL
-// ==============================
 
 bot.command("call", (ctx) => {
   const chatId = ctx.chat.id;
@@ -325,10 +276,6 @@ bot.command("call", (ctx) => {
     `📊 ${game.calledNumbers.length}/75 numbers called`
   );
 });
-
-// ==============================
-// /BINGO
-// ==============================
 
 bot.command("bingo", (ctx) => {
   const chatId = ctx.chat.id;
@@ -380,10 +327,6 @@ bot.command("bingo", (ctx) => {
   );
 });
 
-// ==============================
-// /ENDGAME
-// ==============================
-
 bot.command("endgame", (ctx) => {
   const chatId = ctx.chat.id;
   const game = games.get(chatId);
@@ -405,10 +348,6 @@ bot.command("endgame", (ctx) => {
   ctx.reply("🏁 Bingo game ended!");
 });
 
-// ==============================
-// /HELP
-// ==============================
-
 bot.command("help", (ctx) => {
   ctx.reply(
     "🎱 BINGO COMMANDS\n\n" +
@@ -421,11 +360,59 @@ bot.command("help", (ctx) => {
   );
 });
 
-// ==============================
-// MINI APP WEB SERVER
-// ==============================
-
 const server = http.createServer((req, res) => {
+
+  if (req.url.startsWith("/api/card")) {
+
+    const url = new URL(
+      req.url,
+      `http://${req.headers.host}`
+    );
+
+    const chatId = url.searchParams.get("chatId");
+    const userId = url.searchParams.get("userId");
+
+    const game = games.get(Number(chatId));
+
+    if (!game) {
+      res.writeHead(404, {
+        "Content-Type": "application/json"
+      });
+
+      res.end(JSON.stringify({
+        error: "No Bingo game found"
+      }));
+
+      return;
+    }
+
+    const player = game.players.get(Number(userId));
+
+    if (!player) {
+      res.writeHead(404, {
+        "Content-Type": "application/json"
+      });
+
+      res.end(JSON.stringify({
+        error: "You are not in this Bingo game"
+      }));
+
+      return;
+    }
+
+    res.writeHead(200, {
+      "Content-Type": "application/json"
+    });
+
+    res.end(JSON.stringify({
+      name: player.name,
+      card: player.card,
+      calledNumbers: game.calledNumbers,
+      winner: game.winner
+    }));
+
+    return;
+  }
 
   if (req.url === "/miniapp" || req.url === "/miniapp/") {
 
@@ -445,6 +432,7 @@ const server = http.createServer((req, res) => {
         });
 
         res.end("Mini App error");
+
         return;
       }
 
@@ -465,27 +453,15 @@ const server = http.createServer((req, res) => {
   res.end("Bingo bot is running!");
 });
 
-// ==============================
-// START WEB SERVER
-// ==============================
-
 server.listen(PORT, "0.0.0.0", () => {
   console.log(
     `🌐 Web server running on port ${PORT}`
   );
 });
 
-// ==============================
-// START TELEGRAM BOT
-// ==============================
-
 bot.launch();
 
 console.log("🎱 Bingo bot is running!");
-
-// ==============================
-// STOP BOT SAFELY
-// ==============================
 
 process.once("SIGINT", () => {
   bot.stop("SIGINT");
