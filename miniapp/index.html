@@ -89,6 +89,22 @@
       transform: scale(0.95);
     }
 
+    #bingoButton {
+      margin-top: 20px;
+      padding: 14px 30px;
+      border: none;
+      border-radius: 10px;
+      background: #ff9800;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #bingoButton:active {
+      transform: scale(0.95);
+    }
+
     #error {
       color: red;
       margin-top: 15px;
@@ -127,9 +143,16 @@
 
   </div>
 
+  <br>
+
+  <button id="bingoButton">
+    🏆 BINGO!
+  </button>
+
   <div id="message"></div>
 
   <div id="error"></div>
+
 
   <script>
 
@@ -138,66 +161,95 @@
     tg.ready();
     tg.expand();
 
-    const user = tg.initDataUnsafe.user;
+    const user =
+      tg.initDataUnsafe.user;
 
     const params =
-      new URLSearchParams(window.location.search);
+      new URLSearchParams(
+        window.location.search
+      );
 
     const chatId =
       params.get("chatId") ||
       tg.initDataUnsafe.start_param;
 
     const cardElement =
-      document.getElementById("bingoCard");
+      document.getElementById(
+        "bingoCard"
+      );
 
     const statusElement =
-      document.getElementById("status");
+      document.getElementById(
+        "status"
+      );
 
     const calledElement =
-      document.getElementById("called");
+      document.getElementById(
+        "called"
+      );
 
     const messageElement =
-      document.getElementById("message");
+      document.getElementById(
+        "message"
+      );
 
     const errorElement =
-      document.getElementById("error");
+      document.getElementById(
+        "error"
+      );
+
+    const bingoButton =
+      document.getElementById(
+        "bingoButton"
+      );
 
     let bingoCard = [];
 
     let calledNumbers = [];
 
-    let markedNumbers = new Set();
+    let markedNumbers =
+      new Set();
 
 
     async function loadCard() {
 
       if (!user) {
+
         errorElement.textContent =
           "❌ Telegram user not found.";
+
         return;
       }
 
       if (!chatId) {
+
         errorElement.textContent =
           "❌ Game chat was not found.";
+
         return;
       }
 
       try {
 
-        const response = await fetch(
-          `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(user.id)}&_=${Date.now()}`
-        );
+        const response =
+          await fetch(
+            `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(user.id)}&_=${Date.now()}`
+          );
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
         if (!response.ok) {
+
           throw new Error(
-            data.error || "Could not load card."
+            data.error ||
+            "Could not load card."
           );
+
         }
 
-        bingoCard = data.card;
+        bingoCard =
+          data.card;
 
         calledNumbers =
           data.calledNumbers || [];
@@ -205,7 +257,9 @@
         statusElement.textContent =
           `👤 ${data.name}`;
 
-        if (calledNumbers.length === 0) {
+        if (
+          calledNumbers.length === 0
+        ) {
 
           calledElement.textContent =
             "🎱 Called numbers: None";
@@ -225,7 +279,8 @@
         errorElement.textContent =
           "❌ " + error.message;
 
-        statusElement.textContent = "";
+        statusElement.textContent =
+          "";
 
       }
     }
@@ -233,31 +288,51 @@
 
     function drawCard() {
 
-      cardElement.innerHTML = "";
+      cardElement.innerHTML =
+        "";
 
-      for (let row = 0; row < 5; row++) {
+      for (
+        let row = 0;
+        row < 5;
+        row++
+      ) {
 
         const rowElement =
-          document.createElement("div");
+          document.createElement(
+            "div"
+          );
 
-        rowElement.className = "row";
+        rowElement.className =
+          "row";
 
-        for (let column = 0; column < 5; column++) {
+        for (
+          let column = 0;
+          column < 5;
+          column++
+        ) {
 
           const cell =
-            document.createElement("div");
+            document.createElement(
+              "div"
+            );
 
-          cell.className = "cell";
+          cell.className =
+            "cell";
 
           const value =
             bingoCard[row][column];
 
-          cell.textContent = value;
+          cell.textContent =
+            value;
 
 
-          if (value === "FREE") {
+          if (
+            value === "FREE"
+          ) {
 
-            cell.classList.add("free");
+            cell.classList.add(
+              "free"
+            );
 
           }
 
@@ -265,44 +340,65 @@
           if (
             value !== "FREE" &&
             calledNumbers.some(
-              n => Number(n) === Number(value)
+              n =>
+                Number(n) ===
+                Number(value)
             )
           ) {
 
-            cell.classList.add("called");
+            cell.classList.add(
+              "called"
+            );
 
           }
 
 
           if (
-            markedNumbers.has(Number(value))
+            markedNumbers.has(
+              Number(value)
+            )
           ) {
 
-            cell.classList.add("marked");
+            cell.classList.add(
+              "marked"
+            );
 
           }
 
 
           cell.addEventListener(
             "click",
-            () => markNumber(value, cell)
+            () =>
+              markNumber(
+                value,
+                cell
+              )
           );
 
 
-          rowElement.appendChild(cell);
+          rowElement.appendChild(
+            cell
+          );
 
         }
 
-        cardElement.appendChild(rowElement);
+        cardElement.appendChild(
+          rowElement
+        );
 
       }
 
     }
 
 
-    function markNumber(value, cell) {
+    function markNumber(
+      value,
+      cell
+    ) {
 
-      if (value === "FREE") {
+      if (
+        value === "FREE"
+      ) {
         return;
       }
 
@@ -311,7 +407,9 @@
 
       if (
         !calledNumbers.some(
-          n => Number(n) === number
+          n =>
+            Number(n) ===
+            number
         )
       ) {
 
@@ -321,23 +419,85 @@
         return;
       }
 
-      if (markedNumbers.has(number)) {
+      if (
+        markedNumbers.has(number)
+      ) {
 
-        markedNumbers.delete(number);
+        markedNumbers.delete(
+          number
+        );
 
-        cell.classList.remove("marked");
+        cell.classList.remove(
+          "marked"
+        );
 
         messageElement.textContent =
           "↩️ Number unmarked.";
 
       } else {
 
-        markedNumbers.add(number);
+        markedNumbers.add(
+          number
+        );
 
-        cell.classList.add("marked");
+        cell.classList.add(
+          "marked"
+        );
 
         messageElement.textContent =
           "✅ Number marked!";
+
+      }
+
+    }
+
+
+    bingoButton.addEventListener(
+      "click",
+      checkBingo
+    );
+
+
+    async function checkBingo() {
+
+      messageElement.textContent =
+        "🔎 Checking Bingo...";
+
+      bingoButton.disabled =
+        true;
+
+      try {
+
+        const response =
+          await fetch(
+            `/api/bingo?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(user.id)}&_=${Date.now()}`
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+
+          throw new Error(
+            data.error ||
+            "Bingo verification failed."
+          );
+
+        }
+
+        messageElement.textContent =
+          "🏆🎉 BINGO! You won! 🎉🏆";
+
+        bingoButton.textContent =
+          "🏆 BINGO WINNER!";
+
+      } catch (error) {
+
+        messageElement.textContent =
+          "❌ " + error.message;
+
+        bingoButton.disabled =
+          false;
 
       }
 
