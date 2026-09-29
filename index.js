@@ -1,4 +1,4 @@
-const { Telegraf } = require("telegraf");
+const { Telegraf, Markup } = require("telegraf");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -139,6 +139,7 @@ bot.start((ctx) => {
     "/newgame - Create a game\n" +
     "/join - Join the game\n" +
     "/players - Show players\n" +
+    "/play - Open your Bingo card\n" +
     "/call - Call a number\n" +
     "/bingo - Claim Bingo\n" +
     "/endgame - End the game\n" +
@@ -230,6 +231,40 @@ bot.command("players", (ctx) => {
   }
 
   ctx.reply(text);
+});
+
+bot.command("play", async (ctx) => {
+  const chatId = ctx.chat.id;
+  const game = games.get(chatId);
+
+  if (!game) {
+    return ctx.reply(
+      "❌ No Bingo game is running.\nUse /newgame first."
+    );
+  }
+
+  const userId = ctx.from.id;
+
+  if (!game.players.has(userId)) {
+    return ctx.reply(
+      "❌ You are not in this game.\nUse /join first."
+    );
+  }
+
+  const botUsername = bot.botInfo.username;
+
+  const miniAppLink =
+    `https://t.me/${botUsername}?startapp=${encodeURIComponent(chatId)}`;
+
+  await ctx.reply(
+    "🎱 Open your Bingo card below:",
+    Markup.inlineKeyboard([
+      Markup.button.url(
+        "🎱 Open My Bingo Card",
+        miniAppLink
+      )
+    ])
+  );
 });
 
 bot.command("call", (ctx) => {
@@ -354,6 +389,7 @@ bot.command("help", (ctx) => {
     "/newgame - Create a game\n" +
     "/join - Join the game\n" +
     "/players - Show players\n" +
+    "/play - Open your Bingo card\n" +
     "/call - Call a number\n" +
     "/bingo - Claim Bingo\n" +
     "/endgame - End the game"
