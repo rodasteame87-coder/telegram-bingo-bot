@@ -1,85 +1,80 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-  <title>🎱 Bingo</title>
+  <title>Bingo</title>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <style>
     body {
-      margin: 0;
-      padding: 20px;
       font-family: Arial, sans-serif;
       background: #f2f2f2;
+      margin: 0;
+      padding: 20px;
       text-align: center;
     }
 
     h1 {
-      margin: 5px 0;
+      margin-bottom: 10px;
     }
 
-    .subtitle {
-      color: #666;
-      margin-bottom: 20px;
-    }
-
-    .status {
-      margin: 10px 0 20px;
+    #status {
+      margin-bottom: 15px;
       font-weight: bold;
     }
 
-    .bingo-board {
+    .card {
+      display: inline-block;
+      background: white;
+      padding: 12px;
+      border-radius: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .headers,
+    .row {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 6px;
-      max-width: 400px;
-      margin: auto;
+      grid-template-columns: repeat(5, 55px);
+      gap: 5px;
+      justify-content: center;
+    }
+
+    .headers div {
+      font-weight: bold;
+      padding: 10px 0;
+      font-size: 18px;
     }
 
     .cell {
-      aspect-ratio: 1;
+      width: 55px;
+      height: 55px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: white;
+      background: #eeeeee;
       border-radius: 8px;
-      font-size: 18px;
       font-weight: bold;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .header {
-      background: #2196f3;
-      color: white;
+      font-size: 16px;
     }
 
     .free {
+      background: #ffd54f;
+    }
+
+    .called {
       background: #4caf50;
       color: white;
     }
 
-    .marked {
-      background: #ff9800;
-      color: white;
-    }
-
-    .called {
-      border: 4px solid #f44336;
-      box-sizing: border-box;
-    }
-
-    button {
-      margin-top: 25px;
-      padding: 14px 25px;
-      border: none;
-      border-radius: 10px;
-      font-size: 17px;
-      font-weight: bold;
-      background: #2196f3;
-      color: white;
+    #error {
+      color: red;
+      margin-top: 15px;
     }
   </style>
 </head>
@@ -88,17 +83,23 @@
 
   <h1>🎱 Bingo</h1>
 
-  <div id="playerName" class="subtitle">
-    Loading player...
+  <div id="status">Loading your card...</div>
+
+  <div class="card">
+
+    <div class="headers">
+      <div>B</div>
+      <div>I</div>
+      <div>N</div>
+      <div>G</div>
+      <div>O</div>
+    </div>
+
+    <div id="bingoCard"></div>
+
   </div>
 
-  <div id="status" class="status">
-    Loading game...
-  </div>
-
-  <div id="board" class="bingo-board"></div>
-
-  <button onclick="loadCard()">🔄 Refresh</button>
+  <div id="error"></div>
 
   <script>
     const tg = window.Telegram.WebApp;
@@ -106,48 +107,43 @@
     tg.ready();
     tg.expand();
 
-    const playerName = document.getElementById("playerName");
-    const status = document.getElementById("status");
-    const board = document.getElementById("board");
+    const user = tg.initDataUnsafe.user;
+
+    const params = new URLSearchParams(
+      window.location.search
+    );
+
+    const chatId =
+      params.get("chatId") ||
+      tg.initDataUnsafe.start_param;
+
+    const cardElement =
+      document.getElementById("bingoCard");
+
+    const statusElement =
+      document.getElementById("status");
+
+    const errorElement =
+      document.getElementById("error");
 
     async function loadCard() {
-
-      const user = tg.initDataUnsafe.user;
-
       if (!user) {
-        playerName.textContent = "Telegram user not found";
-        status.textContent = "Please open this Mini App from Telegram.";
+        errorElement.textContent =
+          "❌ Please open the Mini App from Telegram.";
+
+        statusElement.textContent = "";
         return;
       }
 
-      playerName.textContent =
-        "👤 " + (user.first_name || "Player");
+      if (!chatId) {
+        errorElement.textContent =
+          "❌ Game chat was not found.";
 
-      status.textContent = "🔎 Looking for your Bingo game...";
-
-      /*
-        The current bot stores games by GROUP CHAT ID.
-
-        Telegram Mini Apps opened from the bot's private menu
-        do not automatically provide the group chat ID.
-
-        Therefore, this version checks whether the bot has
-        provided a game ID through Telegram start parameters.
-      */
-
-      const startParam = tg.initDataUnsafe.start_param;
-
-      if (!startParam) {
-        status.textContent =
-          "⚠️ Open the Mini App from a Bingo game link.";
-        board.innerHTML = "";
+        statusElement.textContent = "";
         return;
       }
-
-      const chatId = startParam;
 
       try {
-
         const response = await fetch(
           `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(user.id)}`
         );
@@ -155,50 +151,44 @@
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || "Game not found");
+          throw new Error(
+            data.error || "Could not load your card."
+          );
         }
 
-        displayCard(
+        statusElement.textContent =
+          `👤 ${data.name}`;
+
+        drawCard(
           data.card,
           data.calledNumbers || []
         );
 
-        status.textContent =
-          "🎮 Bingo game connected";
+        if (data.winner) {
+          statusElement.textContent +=
+            ` 🏆 Winner: ${data.winner}`;
+        }
 
       } catch (error) {
-
-        console.error(error);
-
-        status.textContent =
+        errorElement.textContent =
           "❌ " + error.message;
 
-        board.innerHTML = "";
+        statusElement.textContent = "";
       }
     }
 
-    function displayCard(card, calledNumbers) {
-
-      board.innerHTML = "";
-
-      const letters = ["B", "I", "N", "G", "O"];
-
-      for (let i = 0; i < 5; i++) {
-
-        const header = document.createElement("div");
-
-        header.className = "cell header";
-
-        header.textContent = letters[i];
-
-        board.appendChild(header);
-      }
+    function drawCard(card, calledNumbers) {
+      cardElement.innerHTML = "";
 
       for (let row = 0; row < 5; row++) {
+        const rowElement =
+          document.createElement("div");
+
+        rowElement.className = "row";
 
         for (let column = 0; column < 5; column++) {
-
-          const cell = document.createElement("div");
+          const cell =
+            document.createElement("div");
 
           cell.className = "cell";
 
@@ -217,16 +207,10 @@
             cell.classList.add("called");
           }
 
-          cell.onclick = function() {
-
-            if (value !== "FREE") {
-              cell.classList.toggle("marked");
-            }
-
-          };
-
-          board.appendChild(cell);
+          rowElement.appendChild(cell);
         }
+
+        cardElement.appendChild(rowElement);
       }
     }
 
