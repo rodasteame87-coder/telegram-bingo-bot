@@ -5,6 +5,7 @@ const path = require("path");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const PORT = process.env.PORT || 3000;
+const MINIAPP_URL = "https://telegram-bingo-bot-q54q.onrender.com/miniapp";
 
 if (!BOT_TOKEN) {
   console.error("BOT_TOKEN is missing!");
@@ -28,27 +29,19 @@ function createBingoCard() {
   for (let column = 0; column < 5; column++) {
     const numbers = [];
 
-    for (
-      let n = ranges[column][0];
-      n <= ranges[column][1];
-      n++
-    ) {
+    for (let n = ranges[column][0]; n <= ranges[column][1]; n++) {
       numbers.push(n);
     }
 
     numbers.sort(() => Math.random() - 0.5);
 
     for (let row = 0; row < 5; row++) {
-      if (!card[row]) {
-        card[row] = [];
-      }
-
+      if (!card[row]) card[row] = [];
       card[row][column] = numbers[row];
     }
   }
 
   card[2][2] = "FREE";
-
   return card;
 }
 
@@ -61,7 +54,6 @@ function formatCard(card) {
     for (let column = 0; column < 5; column++) {
       text += String(card[row][column]).padStart(5, " ");
     }
-
     text += "\n";
   }
 
@@ -135,7 +127,6 @@ function hasBingo(card, calledNumbers) {
 bot.start((ctx) => {
   ctx.reply(
     "🎱 Welcome to Bingo Bot!\n\n" +
-    "Commands:\n\n" +
     "/newgame - Create a game\n" +
     "/join - Join the game\n" +
     "/players - Show players\n" +
@@ -180,17 +171,13 @@ bot.command("join", (ctx) => {
   }
 
   if (game.winner) {
-    return ctx.reply(
-      "🏁 This game already has a winner."
-    );
+    return ctx.reply("🏁 This game already has a winner.");
   }
 
   const userId = ctx.from.id;
 
   if (game.players.has(userId)) {
-    return ctx.reply(
-      "⚠️ You are already in the game."
-    );
+    return ctx.reply("⚠️ You are already in the game.");
   }
 
   const card = createBingoCard();
@@ -207,19 +194,14 @@ bot.command("join", (ctx) => {
 });
 
 bot.command("players", (ctx) => {
-  const chatId = ctx.chat.id;
-  const game = games.get(chatId);
+  const game = games.get(ctx.chat.id);
 
   if (!game) {
-    return ctx.reply(
-      "❌ No Bingo game is running."
-    );
+    return ctx.reply("❌ No Bingo game is running.");
   }
 
   if (game.players.size === 0) {
-    return ctx.reply(
-      "👥 No players have joined yet."
-    );
+    return ctx.reply("👥 No players have joined yet.");
   }
 
   let text = "👥 BINGO PLAYERS\n\n";
@@ -243,56 +225,43 @@ bot.command("play", async (ctx) => {
     );
   }
 
-  const userId = ctx.from.id;
-
-  if (!game.players.has(userId)) {
+  if (!game.players.has(ctx.from.id)) {
     return ctx.reply(
       "❌ You are not in this game.\nUse /join first."
     );
   }
 
-  const botUsername = bot.botInfo.username;
-
-  const miniAppLink =
-    `https://t.me/${botUsername}?startapp=${encodeURIComponent(chatId)}`;
+  const appUrl =
+    `${MINIAPP_URL}?chatId=${encodeURIComponent(chatId)}`;
 
   await ctx.reply(
     "🎱 Open your Bingo card below:",
     Markup.inlineKeyboard([
-      Markup.button.url(
+      Markup.button.webApp(
         "🎱 Open My Bingo Card",
-        miniAppLink
+        appUrl
       )
     ])
   );
 });
 
 bot.command("call", (ctx) => {
-  const chatId = ctx.chat.id;
-  const game = games.get(chatId);
+  const game = games.get(ctx.chat.id);
 
   if (!game) {
-    return ctx.reply(
-      "❌ No Bingo game is running."
-    );
+    return ctx.reply("❌ No Bingo game is running.");
   }
 
   if (game.winner) {
-    return ctx.reply(
-      `🏆 ${game.winner} already won this game!`
-    );
+    return ctx.reply(`🏆 ${game.winner} already won this game!`);
   }
 
   if (game.players.size === 0) {
-    return ctx.reply(
-      "⚠️ Nobody has joined yet. Use /join first."
-    );
+    return ctx.reply("⚠️ Nobody has joined yet. Use /join first.");
   }
 
   if (game.calledNumbers.length >= 75) {
-    return ctx.reply(
-      "🎱 All 75 numbers have been called!"
-    );
+    return ctx.reply("🎱 All 75 numbers have been called!");
   }
 
   let number;
@@ -303,29 +272,22 @@ bot.command("call", (ctx) => {
 
   game.calledNumbers.push(number);
 
-  const letter = getLetter(number);
-
   ctx.reply(
     `🎱 NUMBER CALLED!\n\n` +
-    `🔔 ${letter}-${number}\n\n` +
+    `🔔 ${getLetter(number)}-${number}\n\n` +
     `📊 ${game.calledNumbers.length}/75 numbers called`
   );
 });
 
 bot.command("bingo", (ctx) => {
-  const chatId = ctx.chat.id;
-  const game = games.get(chatId);
+  const game = games.get(ctx.chat.id);
 
   if (!game) {
-    return ctx.reply(
-      "❌ No Bingo game is running.\nUse /newgame first."
-    );
+    return ctx.reply("❌ No Bingo game is running.");
   }
 
   if (game.winner) {
-    return ctx.reply(
-      `🏆 ${game.winner} already won this game!`
-    );
+    return ctx.reply(`🏆 ${game.winner} already won this game!`);
   }
 
   const player = game.players.get(ctx.from.id);
@@ -337,20 +299,11 @@ bot.command("bingo", (ctx) => {
   }
 
   if (game.calledNumbers.length === 0) {
-    return ctx.reply(
-      "⚠️ No numbers have been called yet."
-    );
+    return ctx.reply("⚠️ No numbers have been called yet.");
   }
 
-  const winner = hasBingo(
-    player.card,
-    game.calledNumbers
-  );
-
-  if (!winner) {
-    return ctx.reply(
-      "❌ Not Bingo yet!\nKeep playing."
-    );
+  if (!hasBingo(player.card, game.calledNumbers)) {
+    return ctx.reply("❌ Not Bingo yet!\nKeep playing.");
   }
 
   game.winner = player.name;
@@ -363,13 +316,10 @@ bot.command("bingo", (ctx) => {
 });
 
 bot.command("endgame", (ctx) => {
-  const chatId = ctx.chat.id;
-  const game = games.get(chatId);
+  const game = games.get(ctx.chat.id);
 
   if (!game) {
-    return ctx.reply(
-      "❌ No Bingo game is running."
-    );
+    return ctx.reply("❌ No Bingo game is running.");
   }
 
   if (ctx.from.id !== game.hostId) {
@@ -378,7 +328,7 @@ bot.command("endgame", (ctx) => {
     );
   }
 
-  games.delete(chatId);
+  games.delete(ctx.chat.id);
 
   ctx.reply("🏁 Bingo game ended!");
 });
@@ -450,7 +400,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.url === "/miniapp" || req.url === "/miniapp/") {
+  if (req.url.startsWith("/miniapp")) {
 
     const filePath = path.join(
       __dirname,
@@ -461,14 +411,11 @@ const server = http.createServer((req, res) => {
     fs.readFile(filePath, (err, data) => {
 
       if (err) {
-        console.error(err);
-
         res.writeHead(500, {
           "Content-Type": "text/plain"
         });
 
         res.end("Mini App error");
-
         return;
       }
 
@@ -490,9 +437,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `🌐 Web server running on port ${PORT}`
-  );
+  console.log(`🌐 Web server running on port ${PORT}`);
 });
 
 bot.launch();
@@ -506,3 +451,14 @@ process.once("SIGINT", () => {
 process.once("SIGTERM", () => {
   bot.stop("SIGTERM");
 });
+
+After pasting
+
+1. Tap Commit changes.
+2. Go to Render.
+3. Manual Deploy → Deploy latest commit.
+4. Wait for Live.
+
+Then don't test yet. We also need one tiny change in "miniapp/index.html" so it reads the "chatId" from the URL.
+
+Tell me “Live” when Render finishes.
