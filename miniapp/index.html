@@ -2,7 +2,6 @@
 <html>
 <head>
   <meta charset="UTF-8">
-
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0"
@@ -14,104 +13,111 @@
 
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f2f2f2;
       margin: 0;
       padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
       text-align: center;
     }
 
     h1 {
-      margin-bottom: 10px;
+      margin-bottom: 5px;
+    }
+
+    #playerName {
+      font-size: 18px;
+      margin-bottom: 15px;
     }
 
     #status {
-      margin-bottom: 15px;
-      font-weight: bold;
+      font-size: 16px;
+      margin: 10px 0;
     }
 
-    #called {
+    #latest {
+      font-size: 28px;
+      font-weight: bold;
       margin: 15px 0;
-      padding: 10px;
-      background: white;
-      border-radius: 10px;
-      font-size: 14px;
     }
 
-    .card {
-      display: inline-block;
-      background: white;
-      padding: 12px;
-      border-radius: 15px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    #counter {
+      font-size: 16px;
+      margin-bottom: 15px;
     }
 
-    .headers,
-    .row {
+    .board {
+      max-width: 420px;
+      margin: auto;
       display: grid;
-      grid-template-columns: repeat(5, 55px);
-      gap: 5px;
-      justify-content: center;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
     }
 
-    .headers div {
+    .header {
       font-weight: bold;
-      padding: 10px 0;
       font-size: 18px;
+      padding: 10px 0;
     }
 
     .cell {
-      width: 55px;
-      height: 55px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #eeeeee;
+      background: white;
       border-radius: 8px;
+      padding: 14px 4px;
+      font-size: 18px;
       font-weight: bold;
-      font-size: 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
       cursor: pointer;
       user-select: none;
     }
 
-    .free {
-      background: #ffd54f;
-    }
-
     .called {
-      background: #4caf50 !important;
-      color: white !important;
+      background: #35c759;
+      color: white;
     }
 
     .marked {
-      background: #2196f3 !important;
-      color: white !important;
-      transform: scale(0.95);
+      background: #007aff;
+      color: white;
     }
 
-    #bingoButton {
+    .free {
+      background: #ffcc00;
+      color: black;
+    }
+
+    button {
       margin-top: 20px;
-      padding: 14px 30px;
+      width: 100%;
+      max-width: 420px;
+      padding: 16px;
       border: none;
       border-radius: 10px;
-      background: #ff9800;
+      background: #e53935;
       color: white;
-      font-size: 18px;
+      font-size: 20px;
       font-weight: bold;
-      cursor: pointer;
-    }
-
-    #bingoButton:active {
-      transform: scale(0.95);
-    }
-
-    #error {
-      color: red;
-      margin-top: 15px;
     }
 
     #message {
       margin-top: 15px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .called-list {
+      max-width: 420px;
+      margin: 15px auto;
+      padding: 10px;
+      background: white;
+      border-radius: 10px;
+    }
+
+    .number {
+      display: inline-block;
+      margin: 3px;
+      padding: 6px 9px;
+      border-radius: 6px;
+      background: #ddd;
       font-weight: bold;
     }
   </style>
@@ -119,392 +125,308 @@
 
 <body>
 
-  <h1>🎱 Bingo</h1>
+  <h1>🎱 BINGO</h1>
+
+  <div id="playerName">
+    Loading player...
+  </div>
 
   <div id="status">
-    Loading...
+    🔄 Loading game...
   </div>
 
-  <div id="called">
-    🎱 Called numbers: None
+  <div id="latest">
+    🎱 Waiting for a number
   </div>
 
-  <div class="card">
+  <div id="counter">
+    0/75 numbers called
+  </div>
 
-    <div class="headers">
-      <div>B</div>
-      <div>I</div>
-      <div>N</div>
-      <div>G</div>
-      <div>O</div>
-    </div>
+  <div class="board">
 
-    <div id="bingoCard"></div>
+    <div class="header">B</div>
+    <div class="header">I</div>
+    <div class="header">N</div>
+    <div class="header">G</div>
+    <div class="header">O</div>
+
+    <div id="cell-0-0" class="cell"></div>
+    <div id="cell-0-1" class="cell"></div>
+    <div id="cell-0-2" class="cell"></div>
+    <div id="cell-0-3" class="cell"></div>
+    <div id="cell-0-4" class="cell"></div>
+
+    <div id="cell-1-0" class="cell"></div>
+    <div id="cell-1-1" class="cell"></div>
+    <div id="cell-1-2" class="cell"></div>
+    <div id="cell-1-3" class="cell"></div>
+    <div id="cell-1-4" class="cell"></div>
+
+    <div id="cell-2-0" class="cell"></div>
+    <div id="cell-2-1" class="cell"></div>
+    <div id="cell-2-2" class="cell"></div>
+    <div id="cell-2-3" class="cell"></div>
+    <div id="cell-2-4" class="cell"></div>
+
+    <div id="cell-3-0" class="cell"></div>
+    <div id="cell-3-1" class="cell"></div>
+    <div id="cell-3-2" class="cell"></div>
+    <div id="cell-3-3" class="cell"></div>
+    <div id="cell-3-4" class="cell"></div>
+
+    <div id="cell-4-0" class="cell"></div>
+    <div id="cell-4-1" class="cell"></div>
+    <div id="cell-4-2" class="cell"></div>
+    <div id="cell-4-3" class="cell"></div>
+    <div id="cell-4-4" class="cell"></div>
 
   </div>
 
-  <br>
+  <div class="called-list">
+    <strong>📢 Called numbers</strong>
+    <div id="calledNumbers"></div>
+  </div>
 
-  <button id="bingoButton">
+  <button onclick="claimBingo()">
     🏆 BINGO!
   </button>
 
   <div id="message"></div>
 
-  <div id="error"></div>
-
-
   <script>
 
     const tg = window.Telegram.WebApp;
 
-    tg.ready();
     tg.expand();
 
-    const user =
-      tg.initDataUnsafe.user;
+    const userId = tg.initDataUnsafe?.user?.id;
 
-    const params =
-      new URLSearchParams(
-        window.location.search
-      );
+    const startParam =
+      tg.initDataUnsafe?.start_param || "";
 
-    const chatId =
-      params.get("chatId") ||
-      tg.initDataUnsafe.start_param;
+    const chatId = startParam;
 
-    const cardElement =
-      document.getElementById(
-        "bingoCard"
-      );
-
-    const statusElement =
-      document.getElementById(
-        "status"
-      );
-
-    const calledElement =
-      document.getElementById(
-        "called"
-      );
-
-    const messageElement =
-      document.getElementById(
-        "message"
-      );
-
-    const errorElement =
-      document.getElementById(
-        "error"
-      );
-
-    const bingoButton =
-      document.getElementById(
-        "bingoButton"
-      );
-
-    let bingoCard = [];
-
-    let calledNumbers = [];
-
-    let markedNumbers =
-      new Set();
-
+    let card = [];
+    let markedNumbers = new Set();
 
     async function loadCard() {
 
-      if (!user) {
+      if (!chatId || !userId) {
 
-        errorElement.textContent =
-          "❌ Telegram user not found.";
-
-        return;
-      }
-
-      if (!chatId) {
-
-        errorElement.textContent =
-          "❌ Game chat was not found.";
+        document.getElementById("status").innerText =
+          "❌ Could not identify the game.";
 
         return;
       }
 
       try {
 
-        const response =
-          await fetch(
-            `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(user.id)}&_=${Date.now()}`
-          );
+        const response = await fetch(
+          `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(userId)}`
+        );
 
-        const data =
-          await response.json();
+        const data = await response.json();
 
         if (!response.ok) {
 
-          throw new Error(
-            data.error ||
-            "Could not load card."
-          );
+          document.getElementById("status").innerText =
+            "❌ " + (data.error || "Could not load game.");
 
+          return;
         }
 
-        bingoCard =
-          data.card;
+        card = data.card || [];
 
-        calledNumbers =
+        const calledNumbers =
           data.calledNumbers || [];
 
-        statusElement.textContent =
-          `👤 ${data.name}`;
+        document.getElementById("playerName").innerText =
+          "👤 " + data.name;
 
-        if (
-          calledNumbers.length === 0
-        ) {
+        document.getElementById("status").innerText =
+          data.winner
+            ? "🏆 Winner: " + data.winner
+            : "🟢 Game is running";
 
-          calledElement.textContent =
-            "🎱 Called numbers: None";
+        document.getElementById("counter").innerText =
+          calledNumbers.length + "/75 numbers called";
+
+        if (calledNumbers.length > 0) {
+
+          const latest =
+            calledNumbers[calledNumbers.length - 1];
+
+          document.getElementById("latest").innerText =
+            "🔔 Latest: " + getLetter(latest) + "-" + latest;
 
         } else {
 
-          calledElement.textContent =
-            "🎱 Called numbers: " +
-            calledNumbers.join(", ");
+          document.getElementById("latest").innerText =
+            "🎱 Waiting for a number";
 
         }
 
-        drawCard();
+        displayCalledNumbers(calledNumbers);
+
+        displayCard(calledNumbers);
 
       } catch (error) {
 
-        errorElement.textContent =
-          "❌ " + error.message;
-
-        statusElement.textContent =
-          "";
+        document.getElementById("status").innerText =
+          "❌ Connection error";
 
       }
     }
 
+    function displayCard(calledNumbers) {
 
-    function drawCard() {
+      for (let row = 0; row < 5; row++) {
 
-      cardElement.innerHTML =
-        "";
-
-      for (
-        let row = 0;
-        row < 5;
-        row++
-      ) {
-
-        const rowElement =
-          document.createElement(
-            "div"
-          );
-
-        rowElement.className =
-          "row";
-
-        for (
-          let column = 0;
-          column < 5;
-          column++
-        ) {
+        for (let column = 0; column < 5; column++) {
 
           const cell =
-            document.createElement(
-              "div"
+            document.getElementById(
+              `cell-${row}-${column}`
             );
-
-          cell.className =
-            "cell";
 
           const value =
-            bingoCard[row][column];
+            card[row][column];
 
-          cell.textContent =
-            value;
+          cell.innerText = value;
 
-
-          if (
-            value === "FREE"
-          ) {
-
-            cell.classList.add(
-              "free"
-            );
-
-          }
-
-
-          if (
-            value !== "FREE" &&
-            calledNumbers.some(
-              n =>
-                Number(n) ===
-                Number(value)
-            )
-          ) {
-
-            cell.classList.add(
-              "called"
-            );
-
-          }
-
-
-          if (
-            markedNumbers.has(
-              Number(value)
-            )
-          ) {
-
-            cell.classList.add(
-              "marked"
-            );
-
-          }
-
-
-          cell.addEventListener(
-            "click",
-            () =>
-              markNumber(
-                value,
-                cell
-              )
+          cell.classList.remove(
+            "called",
+            "marked",
+            "free"
           );
 
+          if (value === "FREE") {
 
-          rowElement.appendChild(
-            cell
-          );
+            cell.classList.add("free");
+
+          } else if (
+            markedNumbers.has(value)
+          ) {
+
+            cell.classList.add("marked");
+
+          } else if (
+            calledNumbers.includes(value)
+          ) {
+
+            cell.classList.add("called");
+
+          }
+
+          cell.onclick = () => {
+
+            if (value === "FREE") {
+              return;
+            }
+
+            if (
+              calledNumbers.includes(value)
+            ) {
+
+              if (
+                markedNumbers.has(value)
+              ) {
+
+                markedNumbers.delete(value);
+
+              } else {
+
+                markedNumbers.add(value);
+
+              }
+
+              displayCard(calledNumbers);
+            }
+          };
 
         }
-
-        cardElement.appendChild(
-          rowElement
-        );
-
       }
+    }
+
+    function displayCalledNumbers(numbers) {
+
+      const container =
+        document.getElementById("calledNumbers");
+
+      container.innerHTML = "";
+
+      numbers.forEach(number => {
+
+        const span =
+          document.createElement("span");
+
+        span.className = "number";
+
+        span.innerText =
+          getLetter(number) + "-" + number;
+
+        container.appendChild(span);
+
+      });
 
     }
 
+    function getLetter(number) {
 
-    function markNumber(
-      value,
-      cell
-    ) {
+      if (number <= 15) return "B";
 
-      if (
-        value === "FREE"
-      ) {
-        return;
-      }
+      if (number <= 30) return "I";
 
-      const number =
-        Number(value);
+      if (number <= 45) return "N";
 
-      if (
-        !calledNumbers.some(
-          n =>
-            Number(n) ===
-            number
-        )
-      ) {
+      if (number <= 60) return "G";
 
-        messageElement.textContent =
-          "⚠️ That number has not been called yet.";
-
-        return;
-      }
-
-      if (
-        markedNumbers.has(number)
-      ) {
-
-        markedNumbers.delete(
-          number
-        );
-
-        cell.classList.remove(
-          "marked"
-        );
-
-        messageElement.textContent =
-          "↩️ Number unmarked.";
-
-      } else {
-
-        markedNumbers.add(
-          number
-        );
-
-        cell.classList.add(
-          "marked"
-        );
-
-        messageElement.textContent =
-          "✅ Number marked!";
-
-      }
-
+      return "O";
     }
 
+    async function claimBingo() {
 
-    bingoButton.addEventListener(
-      "click",
-      checkBingo
-    );
-
-
-    async function checkBingo() {
-
-      messageElement.textContent =
-        "🔎 Checking Bingo...";
-
-      bingoButton.disabled =
-        true;
+      document.getElementById("message").innerText =
+        "🔍 Checking Bingo...";
 
       try {
 
-        const response =
-          await fetch(
-            `/api/bingo?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(user.id)}&_=${Date.now()}`
-          );
+        const response = await fetch(
+          `/api/bingo?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(userId)}`
+        );
 
-        const data =
-          await response.json();
+        const data = await response.json();
 
-        if (!response.ok) {
+        if (response.ok) {
 
-          throw new Error(
-            data.error ||
-            "Bingo verification failed."
-          );
+          document.getElementById("message").innerText =
+            "🏆🎉 BINGO! You won!";
 
+          document.getElementById("status").innerText =
+            "🏆 Winner: " + data.winner;
+
+          return;
         }
 
-        messageElement.textContent =
-          "🏆🎉 BINGO! You won! 🎉🏆";
-
-        bingoButton.textContent =
-          "🏆 BINGO WINNER!";
+        document.getElementById("message").innerText =
+          "❌ " + (data.error || "Not Bingo yet!");
 
       } catch (error) {
 
-        messageElement.textContent =
-          "❌ " + error.message;
-
-        bingoButton.disabled =
-          false;
+        document.getElementById("message").innerText =
+          "❌ Connection error.";
 
       }
-
     }
 
-
     loadCard();
+
+    setInterval(() => {
+
+      loadCard();
+
+    }, 3000);
 
   </script>
 
