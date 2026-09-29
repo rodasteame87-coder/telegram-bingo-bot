@@ -33,7 +33,7 @@
     #called {
       margin: 15px 0;
       padding: 10px;
-      background: #fff;
+      background: white;
       border-radius: 10px;
       font-size: 14px;
     }
@@ -70,6 +70,8 @@
       border-radius: 8px;
       font-weight: bold;
       font-size: 16px;
+      cursor: pointer;
+      user-select: none;
     }
 
     .free {
@@ -81,9 +83,20 @@
       color: white !important;
     }
 
+    .marked {
+      background: #2196f3 !important;
+      color: white !important;
+      transform: scale(0.95);
+    }
+
     #error {
       color: red;
       margin-top: 15px;
+    }
+
+    #message {
+      margin-top: 15px;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -92,7 +105,9 @@
 
   <h1>🎱 Bingo</h1>
 
-  <div id="status">Loading...</div>
+  <div id="status">
+    Loading...
+  </div>
 
   <div id="called">
     🎱 Called numbers: None
@@ -111,6 +126,8 @@
     <div id="bingoCard"></div>
 
   </div>
+
+  <div id="message"></div>
 
   <div id="error"></div>
 
@@ -139,8 +156,17 @@
     const calledElement =
       document.getElementById("called");
 
+    const messageElement =
+      document.getElementById("message");
+
     const errorElement =
       document.getElementById("error");
+
+    let bingoCard = [];
+
+    let calledNumbers = [];
+
+    let markedNumbers = new Set();
 
 
     async function loadCard() {
@@ -171,11 +197,13 @@
           );
         }
 
+        bingoCard = data.card;
+
+        calledNumbers =
+          data.calledNumbers || [];
+
         statusElement.textContent =
           `👤 ${data.name}`;
-
-        const calledNumbers =
-          data.calledNumbers || [];
 
         if (calledNumbers.length === 0) {
 
@@ -190,10 +218,7 @@
 
         }
 
-        drawCard(
-          data.card,
-          calledNumbers
-        );
+        drawCard();
 
       } catch (error) {
 
@@ -206,7 +231,7 @@
     }
 
 
-    function drawCard(card, calledNumbers) {
+    function drawCard() {
 
       cardElement.innerHTML = "";
 
@@ -225,36 +250,94 @@
           cell.className = "cell";
 
           const value =
-            card[row][column];
+            bingoCard[row][column];
 
           cell.textContent = value;
+
 
           if (value === "FREE") {
 
             cell.classList.add("free");
 
-          } else {
+          }
 
-            const number =
-              Number(value);
 
-            if (
-              calledNumbers.some(
-                n => Number(n) === number
-              )
-            ) {
+          if (
+            value !== "FREE" &&
+            calledNumbers.some(
+              n => Number(n) === Number(value)
+            )
+          ) {
 
-              cell.classList.add("called");
-
-            }
+            cell.classList.add("called");
 
           }
+
+
+          if (
+            markedNumbers.has(Number(value))
+          ) {
+
+            cell.classList.add("marked");
+
+          }
+
+
+          cell.addEventListener(
+            "click",
+            () => markNumber(value, cell)
+          );
+
 
           rowElement.appendChild(cell);
 
         }
 
         cardElement.appendChild(rowElement);
+
+      }
+
+    }
+
+
+    function markNumber(value, cell) {
+
+      if (value === "FREE") {
+        return;
+      }
+
+      const number =
+        Number(value);
+
+      if (
+        !calledNumbers.some(
+          n => Number(n) === number
+        )
+      ) {
+
+        messageElement.textContent =
+          "⚠️ That number has not been called yet.";
+
+        return;
+      }
+
+      if (markedNumbers.has(number)) {
+
+        markedNumbers.delete(number);
+
+        cell.classList.remove("marked");
+
+        messageElement.textContent =
+          "↩️ Number unmarked.";
+
+      } else {
+
+        markedNumbers.add(number);
+
+        cell.classList.add("marked");
+
+        messageElement.textContent =
+          "✅ Number marked!";
 
       }
 
