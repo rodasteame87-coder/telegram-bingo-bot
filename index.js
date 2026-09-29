@@ -29,7 +29,6 @@ const pool = new Pool({
   }
 });
 
-
 async function initDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS games (
@@ -56,7 +55,6 @@ async function initDatabase() {
 
   console.log("✅ PostgreSQL database ready!");
 }
-
 
 function createBingoCard() {
   const ranges = [
@@ -96,7 +94,6 @@ function createBingoCard() {
   return card;
 }
 
-
 function formatCard(card) {
   let text = "🎟️ YOUR BINGO CARD\n\n";
 
@@ -114,7 +111,6 @@ function formatCard(card) {
   return text;
 }
 
-
 function getLetter(number) {
   if (number <= 15) return "B";
   if (number <= 30) return "I";
@@ -122,7 +118,6 @@ function getLetter(number) {
   if (number <= 60) return "G";
   return "O";
 }
-
 
 function hasBingo(card, calledNumbers) {
   const called = new Set(calledNumbers);
@@ -180,7 +175,6 @@ function hasBingo(card, calledNumbers) {
   return diagonal2;
 }
 
-
 bot.start((ctx) => {
   ctx.reply(
     "🎱 Welcome to Bingo Bot!\n\n" +
@@ -194,7 +188,6 @@ bot.start((ctx) => {
       "/help - Show help"
   );
 });
-
 
 bot.command("newgame", async (ctx) => {
   const chatId = String(ctx.chat.id);
@@ -228,7 +221,6 @@ bot.command("newgame", async (ctx) => {
       "Players can now use /join"
   );
 });
-
 
 bot.command("join", async (ctx) => {
   const chatId = String(ctx.chat.id);
@@ -289,7 +281,6 @@ bot.command("join", async (ctx) => {
   );
 });
 
-
 bot.command("players", async (ctx) => {
   const chatId = String(ctx.chat.id);
 
@@ -317,7 +308,6 @@ bot.command("players", async (ctx) => {
 
   await ctx.reply(text);
 });
-
 
 bot.command("play", async (ctx) => {
   const chatId = String(ctx.chat.id);
@@ -357,7 +347,6 @@ bot.command("play", async (ctx) => {
       link
   );
 });
-
 
 bot.command("call", async (ctx) => {
   const chatId = String(ctx.chat.id);
@@ -436,7 +425,6 @@ bot.command("call", async (ctx) => {
       `📊 ${calledNumbers.length}/75 numbers called`
   );
 });
-
 
 bot.command("bingo", async (ctx) => {
   const chatId = String(ctx.chat.id);
@@ -521,7 +509,6 @@ bot.command("bingo", async (ctx) => {
   );
 });
 
-
 bot.command("endgame", async (ctx) => {
   const chatId = String(ctx.chat.id);
   const userId = String(ctx.from.id);
@@ -559,7 +546,6 @@ bot.command("endgame", async (ctx) => {
   );
 });
 
-
 bot.command("help", (ctx) => {
   ctx.reply(
     "🎱 BINGO COMMANDS\n\n" +
@@ -572,7 +558,6 @@ bot.command("help", (ctx) => {
       "/endgame - End the game"
   );
 });
-
 
 const server = http.createServer(
   async (req, res) => {
@@ -758,6 +743,7 @@ const server = http.createServer(
         await pool.query(
           `
           SELECT
+            host_name,
             called_numbers,
             winner
           FROM games
@@ -817,11 +803,24 @@ const server = http.createServer(
         return;
       }
 
+      const countResult =
+        await pool.query(
+          `
+          SELECT COUNT(*) AS count
+          FROM players
+          WHERE chat_id = $1
+          `,
+          [chatId]
+        );
+
       const game =
         gameResult.rows[0];
 
       const player =
         playerResult.rows[0];
+
+      const playerCount =
+        Number(countResult.rows[0].count);
 
       res.writeHead(200, {
         "Content-Type":
@@ -831,6 +830,8 @@ const server = http.createServer(
       res.end(
         JSON.stringify({
           name: player.name,
+          hostName: game.host_name,
+          playerCount: playerCount,
           card: player.card,
           calledNumbers:
             game.called_numbers || [],
@@ -893,29 +894,23 @@ const server = http.createServer(
   }
 );
 
-
 server.listen(
   PORT,
   "0.0.0.0",
   () => {
-
     console.log(
       `🌐 Web server running on port ${PORT}`
     );
-
   }
 );
 
-
 initDatabase()
   .then(() => {
-
     bot.launch();
 
     console.log(
       "🎱 Bingo bot is running!"
     );
-
   })
   .catch((error) => {
 
@@ -925,25 +920,18 @@ initDatabase()
     );
 
     process.exit(1);
-
   });
-
 
 process.once(
   "SIGINT",
   () => {
-
     bot.stop("SIGINT");
-
   }
 );
-
 
 process.once(
   "SIGTERM",
   () => {
-
     bot.stop("SIGTERM");
-
   }
 );
