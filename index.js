@@ -206,4 +206,393 @@ bot.command("join", (ctx) => {
 });
 
 bot.command("players", (ctx) => {
-  const game =
+  const game = games.get(ctx.chat.id);
+
+  if (!game) {
+    return ctx.reply("❌ No Bingo game is running.");
+  }
+
+  if (game.players.size === 0) {
+    return ctx.reply("👥 No players have joined yet.");
+  }
+
+  let text = "👥 BINGO PLAYERS\n\n";
+  let number = 1;
+
+  for (const player of game.players.values()) {
+    text += `${number}. ${player.name}\n`;
+    number++;
+  }
+
+  ctx.reply(text);
+});
+
+bot.command("play", (ctx) => {
+  const chatId = ctx.chat.id;
+  const game = games.get(chatId);
+
+  if (!game) {
+    return ctx.reply(
+      "❌ No Bingo game is running.\nUse /newgame first."
+    );
+  }
+
+  if (!game.players.has(ctx.from.id)) {
+    return ctx.reply(
+      "❌ You are not in this game.\nUse /join first."
+    );
+  }
+
+  const link =
+    `https://t.me/${BOT_USERNAME}?startapp=${encodeURIComponent(chatId)}`;
+
+  ctx.reply(
+    "🎱 Open your Bingo card:\n\n" +
+      link
+  );
+});
+
+bot.command("call", (ctx) => {
+  const game = games.get(ctx.chat.id);
+
+  if (!game) {
+    return ctx.reply("❌ No Bingo game is running.");
+  }
+
+  if (game.winner) {
+    return ctx.reply(
+      `🏆 ${game.winner} already won this game!`
+    );
+  }
+
+  if (game.players.size === 0) {
+    return ctx.reply(
+      "⚠️ Nobody has joined yet. Use /join first."
+    );
+  }
+
+  if (game.calledNumbers.length >= 75) {
+    return ctx.reply(
+      "🎱 All 75 numbers have been called!"
+    );
+  }
+
+  let number;
+
+  do {
+    number = Math.floor(Math.random() * 75) + 1;
+  } while (game.calledNumbers.includes(number));
+
+  game.calledNumbers.push(number);
+
+  ctx.reply(
+    "🎱 NUMBER CALLED!\n\n" +
+      `🔔 ${getLetter(number)}-${number}\n\n` +
+      `📊 ${game.calledNumbers.length}/75 numbers called`
+  );
+});
+
+bot.command("bingo", (ctx) => {
+  const game = games.get(ctx.chat.id);
+
+  if (!game) {
+    return ctx.reply("❌ No Bingo game is running.");
+  }
+
+  if (game.winner) {
+    return ctx.reply(
+      `🏆 ${game.winner} already won this game!`
+    );
+  }
+
+  const player = game.players.get(ctx.from.id);
+
+  if (!player) {
+    return ctx.reply(
+      "❌ You are not in this game.\nUse /join first."
+    );
+  }
+
+  if (game.calledNumbers.length === 0) {
+    return ctx.reply(
+      "⚠️ No numbers have been called yet."
+    );
+  }
+
+  if (!hasBingo(player.card, game.calledNumbers)) {
+    return ctx.reply(
+      "❌ Not Bingo yet!\nKeep playing."
+    );
+  }
+
+  game.winner = player.name;
+
+  ctx.reply(
+    "🏆🎉 BINGO! 🎉🏆\n\n" +
+      `${player.name} has won the game!\n\n` +
+      `🎱 Numbers called: ${game.calledNumbers.length}`
+  );
+});
+
+bot.command("endgame", (ctx) => {
+  const game = games.get(ctx.chat.id);
+
+  if (!game) {
+    return ctx.reply("❌ No Bingo game is running.");
+  }
+
+  if (ctx.from.id !== game.hostId) {
+    return ctx.reply(
+      "⛔ Only the game host can end the game."
+    );
+  }
+
+  games.delete(ctx.chat.id);
+
+  ctx.reply("🏁 Bingo game ended!");
+});
+
+bot.command("help", (ctx) => {
+  ctx.reply(
+    "🎱 BINGO COMMANDS\n\n" +
+      "/newgame - Create a game\n" +
+      "/join - Join the game\n" +
+      "/players - Show players\n" +
+      "/play - Open your Bingo card\n" +
+      "/call - Call a number\n" +
+      "/bingo - Claim Bingo\n" +
+      "/endgame - End the game"
+  );
+});
+
+const server = http.createServer(async (req, res) => {
+
+  if (req.url.startsWith("/api/bingo")) {
+
+    const url = new URL(
+      req.url,
+      `http://${req.headers.host}`
+    );
+
+    const chatId = Number(
+      url.searchParams.get("chatId")
+    );
+
+    const userId = Number(
+      url.searchParams.get("userId")
+    );
+
+    const game = games.get(chatId);
+
+    if (!game) {
+      res.writeHead(404, {
+        "Content-Type": "application/json"
+      });
+
+      res.end(JSON.stringify({
+        error: "No Bingo game found"
+      }));
+
+      return;
+    }
+
+    if (game.winner) {
+      res.writeHead(400, {
+        "Content-Type": "application/json"
+      });
+
+      res.end(JSON.stringify({
+        error: `${game.winner} already won this game!`
+      }));
+
+      return;
+    }
+
+    const player = game.players.get(userId);
+
+    if (!player) {
+      res.writeHead(404, {
+        "Content-Type": "application/json"
+      });
+
+      res.end(JSON.stringify({
+        error: "You are not in this game"
+      }));
+
+      return;
+    }
+
+    if (!hasBingo(player.card, game.calledNumbers)) {
+      res.writeHead(400, {
+        "Content-Type": "application/json"
+      });
+
+      res.end(JSON.stringify({
+        error: "Not Bingo yet! Keep playing."
+      }));
+
+      return;
+    }
+
+    game.winner = player.name;
+
+    try {
+      await bot.telegram.sendMessage(
+        chatId,
+        "🏆🎉 BINGO! 🎉🏆\n\n" +
+          `${player.name} has won the game!\n\n` +
+          `🎱 Numbers called: ${game.calledNumbers.length}`
+      );
+    } catch (error) {
+      console.error(
+        "Could not announce Bingo:",
+        error.message
+      );
+    }
+
+    res.writeHead(200, {
+      "Content-Type": "application/json"
+    });
+
+    res.end(JSON.stringify({
+      success: true,
+      winner: player.name
+    }));
+
+    return;
+  }
+
+
+  if (req.url.startsWith("/api/card")) {
+
+    const url = new URL(
+      req.url,
+      `http://${req.headers.host}`
+    );
+
+    const chatId =
+      url.searchParams.get("chatId");
+
+    const userId =
+      url.searchParams.get("userId");
+
+    const game =
+      games.get(Number(chatId));
+
+    if (!game) {
+      res.writeHead(404, {
+        "Content-Type": "application/json"
+      });
+
+      res.end(JSON.stringify({
+        error: "No Bingo game found"
+      }));
+
+      return;
+    }
+
+    const player =
+      game.players.get(Number(userId));
+
+    if (!player) {
+      res.writeHead(404, {
+        "Content-Type": "application/json"
+      });
+
+      res.end(JSON.stringify({
+        error: "You are not in this Bingo game"
+      }));
+
+      return;
+    }
+
+    res.writeHead(200, {
+      "Content-Type": "application/json"
+    });
+
+    res.end(JSON.stringify({
+      name: player.name,
+      card: player.card,
+      calledNumbers: game.calledNumbers,
+      winner: game.winner
+    }));
+
+    return;
+  }
+
+
+  if (req.url.startsWith("/miniapp")) {
+
+    const filePath =
+      path.join(
+        __dirname,
+        "miniapp",
+        "index.html"
+      );
+
+    fs.readFile(
+      filePath,
+      (err, data) => {
+
+        if (err) {
+
+          res.writeHead(500, {
+            "Content-Type": "text/plain"
+          });
+
+          res.end("Mini App error");
+
+          return;
+        }
+
+        res.writeHead(200, {
+          "Content-Type": "text/html"
+        });
+
+        res.end(data);
+      }
+    );
+
+    return;
+  }
+
+
+  res.writeHead(200, {
+    "Content-Type": "text/plain"
+  });
+
+  res.end("Bingo bot is running!");
+});
+
+
+server.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+
+    console.log(
+      `🌐 Web server running on port ${PORT}`
+    );
+
+  }
+);
+
+
+bot.launch();
+
+console.log("🎱 Bingo bot is running!");
+
+
+process.once(
+  "SIGINT",
+  () => {
+    bot.stop("SIGINT");
+  }
+);
+
+process.once(
+  "SIGTERM",
+  () => {
+    bot.stop("SIGTERM");
+  }
+);
