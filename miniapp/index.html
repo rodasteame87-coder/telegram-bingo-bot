@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bingo</title>
+
+  <title>🎱 Bingo</title>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
@@ -17,7 +18,7 @@
     }
 
     h1 {
-      margin-bottom: 5px;
+      margin: 5px 0;
     }
 
     .subtitle {
@@ -55,6 +56,11 @@
       color: white;
     }
 
+    .marked {
+      background: #ff9800;
+      color: white;
+    }
+
     button {
       margin-top: 25px;
       padding: 14px 25px;
@@ -76,47 +82,9 @@
     Your Bingo Card
   </div>
 
-  <div class="bingo-board">
+  <div id="board" class="bingo-board"></div>
 
-    <div class="cell header">B</div>
-    <div class="cell header">I</div>
-    <div class="cell header">N</div>
-    <div class="cell header">G</div>
-    <div class="cell header">O</div>
-
-    <div class="cell">1</div>
-    <div class="cell">17</div>
-    <div class="cell">34</div>
-    <div class="cell">49</div>
-    <div class="cell">67</div>
-
-    <div class="cell">5</div>
-    <div class="cell">21</div>
-    <div class="cell">39</div>
-    <div class="cell">53</div>
-    <div class="cell">72</div>
-
-    <div class="cell">8</div>
-    <div class="cell">25</div>
-    <div class="cell free">FREE</div>
-    <div class="cell">57</div>
-    <div class="cell">69</div>
-
-    <div class="cell">11</div>
-    <div class="cell">28</div>
-    <div class="cell">41</div>
-    <div class="cell">46</div>
-    <div class="cell">74</div>
-
-    <div class="cell">14</div>
-    <div class="cell">30</div>
-    <div class="cell">44</div>
-    <div class="cell">59</div>
-    <div class="cell">75</div>
-
-  </div>
-
-  <button onclick="closeApp()">Close</button>
+  <button onclick="newCard()">🎲 New Card</button>
 
   <script>
     const tg = window.Telegram.WebApp;
@@ -124,9 +92,106 @@
     tg.ready();
     tg.expand();
 
-    function closeApp() {
-      tg.close();
+    const ranges = [
+      [1, 15],
+      [16, 30],
+      [31, 45],
+      [46, 60],
+      [61, 75]
+    ];
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+
+      return array;
     }
+
+    function createCard() {
+      const card = [];
+
+      for (let row = 0; row < 5; row++) {
+        card[row] = [];
+      }
+
+      for (let column = 0; column < 5; column++) {
+
+        const numbers = [];
+
+        for (
+          let number = ranges[column][0];
+          number <= ranges[column][1];
+          number++
+        ) {
+          numbers.push(number);
+        }
+
+        shuffle(numbers);
+
+        for (let row = 0; row < 5; row++) {
+          card[row][column] = numbers[row];
+        }
+      }
+
+      card[2][2] = "FREE";
+
+      return card;
+    }
+
+    function displayCard(card) {
+      const board = document.getElementById("board");
+
+      board.innerHTML = "";
+
+      const letters = ["B", "I", "N", "G", "O"];
+
+      for (let i = 0; i < 5; i++) {
+
+        const cell = document.createElement("div");
+
+        cell.className = "cell header";
+        cell.textContent = letters[i];
+
+        board.appendChild(cell);
+      }
+
+      for (let row = 0; row < 5; row++) {
+
+        for (let column = 0; column < 5; column++) {
+
+          const cell = document.createElement("div");
+
+          cell.className = "cell";
+
+          cell.textContent = card[row][column];
+
+          if (card[row][column] === "FREE") {
+            cell.classList.add("free");
+          }
+
+          cell.onclick = function() {
+
+            if (card[row][column] !== "FREE") {
+              cell.classList.toggle("marked");
+            }
+
+          };
+
+          board.appendChild(cell);
+        }
+      }
+    }
+
+    function newCard() {
+      const card = createCard();
+
+      displayCard(card);
+    }
+
+    newCard();
   </script>
 
 </body>
