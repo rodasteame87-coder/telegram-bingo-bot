@@ -30,6 +30,14 @@
       font-weight: bold;
     }
 
+    #called {
+      margin: 15px 0;
+      padding: 10px;
+      background: #fff;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
     .card {
       display: inline-block;
       background: white;
@@ -84,7 +92,11 @@
 
   <h1>🎱 Bingo</h1>
 
-  <div id="status">Loading your card...</div>
+  <div id="status">Loading...</div>
+
+  <div id="called">
+    🎱 Called numbers: None
+  </div>
 
   <div class="card">
 
@@ -103,6 +115,7 @@
   <div id="error"></div>
 
   <script>
+
     const tg = window.Telegram.WebApp;
 
     tg.ready();
@@ -110,9 +123,8 @@
 
     const user = tg.initDataUnsafe.user;
 
-    const params = new URLSearchParams(
-      window.location.search
-    );
+    const params =
+      new URLSearchParams(window.location.search);
 
     const chatId =
       params.get("chatId") ||
@@ -124,53 +136,64 @@
     const statusElement =
       document.getElementById("status");
 
+    const calledElement =
+      document.getElementById("called");
+
     const errorElement =
       document.getElementById("error");
+
 
     async function loadCard() {
 
       if (!user) {
         errorElement.textContent =
-          "❌ Please open the Mini App from Telegram.";
-
-        statusElement.textContent = "";
+          "❌ Telegram user not found.";
         return;
       }
 
       if (!chatId) {
         errorElement.textContent =
           "❌ Game chat was not found.";
-
-        statusElement.textContent = "";
         return;
       }
 
       try {
 
         const response = await fetch(
-          `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(user.id)}`
+          `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(user.id)}&_=${Date.now()}`
         );
 
         const data = await response.json();
 
         if (!response.ok) {
           throw new Error(
-            data.error || "Could not load your card."
+            data.error || "Could not load card."
           );
         }
 
         statusElement.textContent =
           `👤 ${data.name}`;
 
+        const calledNumbers =
+          data.calledNumbers || [];
+
+        if (calledNumbers.length === 0) {
+
+          calledElement.textContent =
+            "🎱 Called numbers: None";
+
+        } else {
+
+          calledElement.textContent =
+            "🎱 Called numbers: " +
+            calledNumbers.join(", ");
+
+        }
+
         drawCard(
           data.card,
-          data.calledNumbers || []
+          calledNumbers
         );
-
-        if (data.winner) {
-          statusElement.textContent +=
-            ` 🏆 Winner: ${data.winner}`;
-        }
 
       } catch (error) {
 
@@ -178,8 +201,10 @@
           "❌ " + error.message;
 
         statusElement.textContent = "";
+
       }
     }
+
 
     function drawCard(card, calledNumbers) {
 
@@ -199,7 +224,8 @@
 
           cell.className = "cell";
 
-          const value = card[row][column];
+          const value =
+            card[row][column];
 
           cell.textContent = value;
 
@@ -217,17 +243,23 @@
                 n => Number(n) === number
               )
             ) {
+
               cell.classList.add("called");
+
             }
 
           }
 
           rowElement.appendChild(cell);
+
         }
 
         cardElement.appendChild(rowElement);
+
       }
+
     }
+
 
     loadCard();
 
