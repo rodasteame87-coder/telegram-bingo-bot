@@ -11,7 +11,6 @@ if (!BOT_TOKEN) {
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Games are stored by Telegram chat ID
 const games = new Map();
 
 // Create a Bingo card
@@ -42,6 +41,7 @@ function createBingoCard() {
     }
   }
 
+  // Free center space
   card[2][2] = "FREE";
 
   return card;
@@ -74,20 +74,88 @@ function getLetter(number) {
   return "O";
 }
 
-// /start
+// Check whether a player has Bingo
+function hasBingo(card, calledNumbers) {
+  const called = new Set(calledNumbers);
+
+  function marked(value) {
+    return value === "FREE" || called.has(value);
+  }
+
+  // Check rows
+  for (let row = 0; row < 5; row++) {
+    let complete = true;
+
+    for (let column = 0; column < 5; column++) {
+      if (!marked(card[row][column])) {
+        complete = false;
+        break;
+      }
+    }
+
+    if (complete) {
+      return true;
+    }
+  }
+
+  // Check columns
+  for (let column = 0; column < 5; column++) {
+    let complete = true;
+
+    for (let row = 0; row < 5; row++) {
+      if (!marked(card[row][column])) {
+        complete = false;
+        break;
+      }
+    }
+
+    if (complete) {
+      return true;
+    }
+  }
+
+  // Check diagonal from top-left to bottom-right
+  let diagonal1 = true;
+
+  for (let i = 0; i < 5; i++) {
+    if (!marked(card[i][i])) {
+      diagonal1 = false;
+      break;
+    }
+  }
+
+  if (diagonal1) {
+    return true;
+  }
+
+  // Check diagonal from top-right to bottom-left
+  let diagonal2 = true;
+
+  for (let i = 0; i < 5; i++) {
+    if (!marked(card[i][4 - i])) {
+      diagonal2 = false;
+      break;
+    }
+  }
+
+  return diagonal2;
+}
+
+// Start command
 bot.start((ctx) => {
   ctx.reply(
     "🎱 Welcome to Bingo Bot!\n\n" +
-    "Add me to a Telegram group and use:\n\n" +
+    "Commands:\n\n" +
     "/newgame - Create a game\n" +
     "/join - Join the game\n" +
-    "/call - Call a number\n" +
     "/players - Show players\n" +
+    "/call - Call a number\n" +
+    "/bingo - Claim Bingo\n" +
     "/endgame - End the game"
   );
 });
 
-// Create a new game
+// Create game
 bot.command("newgame", (ctx) => {
   const chatId = ctx.chat.id;
 
@@ -99,14 +167,14 @@ bot.command("newgame", (ctx) => {
     hostId: ctx.from.id,
     hostName: ctx.from.first_name,
     players: new Map(),
-    calledNumbers: []
+    calledNumbers: [],
+    winner: null
   });
 
   ctx.reply(
     `🎱 NEW BINGO GAME!\n\n` +
     `👑 Host: ${ctx.from.first_name}\n\n` +
-    `Players can now use /join\n\n` +
-    `When everyone has joined, use /call to start calling numbers.`
+    `Players can now use /join`
   );
 });
 
@@ -116,7 +184,13 @@ bot.command("join", (ctx) => {
   const game = games.get(chatId);
 
   if (!game) {
-    return ctx.reply("❌ No Bingo game is running.\nUse /newgame first.");
+    return ctx.reply(
+      "❌ No Bingo game is running.\nUse /newgame first."
+    );
+  }
+
+  if (game.winner) {
+    return ctx.reply("🏁 This game already has a winner.");
   }
 
   const userId = ctx.from.id;
@@ -152,7 +226,6 @@ bot.command("players", (ctx) => {
   }
 
   let text = "👥 BINGO PLAYERS\n\n";
-
   let number = 1;
 
   for (const player of game.players.values()) {
@@ -172,8 +245,16 @@ bot.command("call", (ctx) => {
     return ctx.reply("❌ No Bingo game is running.");
   }
 
+  if (game.winner) {
+    return ctx.reply(
+      `🏆 ${game.winner} already won this game!`
+    );
+  }
+
   if (game.players.size === 0) {
-    return ctx.reply("⚠️ Nobody has joined yet. Use /join first.");
+    return ctx.reply(
+      "⚠️ Nobody has joined yet. Use /join first."
+    );
   }
 
   if (game.calledNumbers.length >= 75) {
@@ -197,6 +278,57 @@ bot.command("call", (ctx) => {
   );
 });
 
+// Claim Bingo
+bot.command("bingo", (ctx) => {
+  const chatId = ctx.chat.id;
+  const game = games.get(chatId);
+
+  if (!game) {
+    return ctx.reply(
+      "❌ No Bingo game is running.\nUse /newgame first."
+    );
+  }
+
+  if (game.winner) {
+    return ctx.reply(
+      `🏆 ${game.winner} already won this game!`
+    );
+  }
+
+  const player = game.players.get(ctx.from.id);
+
+  if (!player) {
+    return ctx.reply(
+      "❌ You are not in this game.\nUse /join first."
+    );
+  }
+
+  if (game.calledNumbers.length === 0) {
+    return ctx.reply(
+      "⚠️ No numbers have been called yet."
+    );
+  }
+
+  const winner = hasBingo(
+    player.card,
+    game.calledNumbers
+  );
+
+  if (!winner) {
+    return ctx.reply(
+      "❌ Not Bingo yet!\nKeep playing."
+    );
+  }
+
+  game.winner = player.name;
+
+  ctx.reply(
+    `🏆🎉 BINGO! 🎉🏆\n\n` +
+    `${player.name} has won the game!\n\n` +
+    `🎱 Numbers called: ${game.calledNumbers.length}`
+  );
+});
+
 // End game
 bot.command("endgame", (ctx) => {
   const chatId = ctx.chat.id;
@@ -207,7 +339,9 @@ bot.command("endgame", (ctx) => {
   }
 
   if (ctx.from.id !== game.hostId) {
-    return ctx.reply("⛔ Only the game host can end the game.");
+    return ctx.reply(
+      "⛔ Only the game host can end the game."
+    );
   }
 
   games.delete(chatId);
@@ -223,6 +357,7 @@ bot.command("help", (ctx) => {
     "/join - Join the game\n" +
     "/players - Show players\n" +
     "/call - Call a number\n" +
+    "/bingo - Claim Bingo\n" +
     "/endgame - End the game"
   );
 });
@@ -237,6 +372,7 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`🌐 Web server running on port ${PORT}`);
 });
 
+// Start Telegram bot
 bot.launch();
 
 console.log("🎱 Bingo bot is running!");
