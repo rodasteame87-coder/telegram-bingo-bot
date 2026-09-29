@@ -26,6 +26,11 @@
       margin-bottom: 20px;
     }
 
+    .status {
+      margin: 10px 0 20px;
+      font-weight: bold;
+    }
+
     .bingo-board {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
@@ -61,6 +66,11 @@
       color: white;
     }
 
+    .called {
+      border: 4px solid #f44336;
+      box-sizing: border-box;
+    }
+
     button {
       margin-top: 25px;
       padding: 14px 25px;
@@ -78,13 +88,17 @@
 
   <h1>🎱 Bingo</h1>
 
-  <div class="subtitle">
-    Your Bingo Card
+  <div id="playerName" class="subtitle">
+    Loading player...
+  </div>
+
+  <div id="status" class="status">
+    Loading game...
   </div>
 
   <div id="board" class="bingo-board"></div>
 
-  <button onclick="newCard()">🎲 New Card</button>
+  <button onclick="loadCard()">🔄 Refresh</button>
 
   <script>
     const tg = window.Telegram.WebApp;
@@ -92,57 +106,78 @@
     tg.ready();
     tg.expand();
 
-    const ranges = [
-      [1, 15],
-      [16, 30],
-      [31, 45],
-      [46, 60],
-      [61, 75]
-    ];
+    const playerName = document.getElementById("playerName");
+    const status = document.getElementById("status");
+    const board = document.getElementById("board");
 
-    function shuffle(array) {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+    async function loadCard() {
 
-        [array[i], array[j]] = [array[j], array[i]];
+      const user = tg.initDataUnsafe.user;
+
+      if (!user) {
+        playerName.textContent = "Telegram user not found";
+        status.textContent = "Please open this Mini App from Telegram.";
+        return;
       }
 
-      return array;
-    }
+      playerName.textContent =
+        "👤 " + (user.first_name || "Player");
 
-    function createCard() {
-      const card = [];
+      status.textContent = "🔎 Looking for your Bingo game...";
 
-      for (let row = 0; row < 5; row++) {
-        card[row] = [];
+      /*
+        The current bot stores games by GROUP CHAT ID.
+
+        Telegram Mini Apps opened from the bot's private menu
+        do not automatically provide the group chat ID.
+
+        Therefore, this version checks whether the bot has
+        provided a game ID through Telegram start parameters.
+      */
+
+      const startParam = tg.initDataUnsafe.start_param;
+
+      if (!startParam) {
+        status.textContent =
+          "⚠️ Open the Mini App from a Bingo game link.";
+        board.innerHTML = "";
+        return;
       }
 
-      for (let column = 0; column < 5; column++) {
+      const chatId = startParam;
 
-        const numbers = [];
+      try {
 
-        for (
-          let number = ranges[column][0];
-          number <= ranges[column][1];
-          number++
-        ) {
-          numbers.push(number);
+        const response = await fetch(
+          `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(user.id)}`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Game not found");
         }
 
-        shuffle(numbers);
+        displayCard(
+          data.card,
+          data.calledNumbers || []
+        );
 
-        for (let row = 0; row < 5; row++) {
-          card[row][column] = numbers[row];
-        }
+        status.textContent =
+          "🎮 Bingo game connected";
+
+      } catch (error) {
+
+        console.error(error);
+
+        status.textContent =
+          "❌ " + error.message;
+
+        board.innerHTML = "";
       }
-
-      card[2][2] = "FREE";
-
-      return card;
     }
 
-    function displayCard(card) {
-      const board = document.getElementById("board");
+    function displayCard(card, calledNumbers) {
 
       board.innerHTML = "";
 
@@ -150,12 +185,13 @@
 
       for (let i = 0; i < 5; i++) {
 
-        const cell = document.createElement("div");
+        const header = document.createElement("div");
 
-        cell.className = "cell header";
-        cell.textContent = letters[i];
+        header.className = "cell header";
 
-        board.appendChild(cell);
+        header.textContent = letters[i];
+
+        board.appendChild(header);
       }
 
       for (let row = 0; row < 5; row++) {
@@ -166,15 +202,24 @@
 
           cell.className = "cell";
 
-          cell.textContent = card[row][column];
+          const value = card[row][column];
 
-          if (card[row][column] === "FREE") {
+          cell.textContent = value;
+
+          if (value === "FREE") {
             cell.classList.add("free");
+          }
+
+          if (
+            value !== "FREE" &&
+            calledNumbers.includes(value)
+          ) {
+            cell.classList.add("called");
           }
 
           cell.onclick = function() {
 
-            if (card[row][column] !== "FREE") {
+            if (value !== "FREE") {
               cell.classList.toggle("marked");
             }
 
@@ -185,13 +230,7 @@
       }
     }
 
-    function newCard() {
-      const card = createCard();
-
-      displayCard(card);
-    }
-
-    newCard();
+    loadCard();
   </script>
 
 </body>
