@@ -4,10 +4,23 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!BOT_TOKEN) {
+  console.error("BOT_TOKEN is missing");
+  process.exit(1);
+}
+
+if (!DATABASE_URL) {
+  console.error("DATABASE_URL is missing");
+  process.exit(1);
+}
+
+const bot = new Telegraf(BOT_TOKEN);
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
   }
@@ -38,13 +51,12 @@ async function initDatabase() {
     )
   `);
 
-  // Add the column to existing databases without deleting anything.
   await pool.query(`
     ALTER TABLE players
     ADD COLUMN IF NOT EXISTS marked_numbers JSONB NOT NULL DEFAULT '[]'
   `);
 
-  console.log("Database ready");
+  console.log("Database initialized");
 }
 
 function generateCard() {
@@ -60,11 +72,11 @@ function generateCard() {
     const numbers = [];
 
     while (numbers.length < 5) {
-      const n =
+      const number =
         Math.floor(Math.random() * (max - min + 1)) + min;
 
-      if (!numbers.includes(n)) {
-        numbers.push(n);
+      if (!numbers.includes(number)) {
+        numbers.push(number);
       }
     }
 
@@ -90,13 +102,15 @@ function generateCard() {
   return card;
 }
 
-function hasBingo(card, markedNumbers) {
-  const marked = new Set(
-    (markedNumbers || []).map(String)
-  );
+function cardContainsNumber(card, number) {
+  return card.some(row => row.includes(number));
+}
+
+function checkBingo(card, markedNumbers) {
+  const marked = new Set(markedNumbers);
 
   function isMarked(value) {
-    return value === "FREE" || marked.has(String(value));
+    return value === "FREE" || marked.has(value);
   }
 
   // Rows
@@ -122,48 +136,40 @@ function hasBingo(card, markedNumbers) {
     }
   }
 
-  // Diagonal
-  let diagonal1 = true;
-
-  for (let i = 0; i < 5; i++) {
-    if (!isMarked(card[i][i])) {
-      diagonal1 = false;
-      break;
-    }
-  }
-
-  if (diagonal1) {
+  // Main diagonal
+  if (
+    isMarked(card[0][0]) &&
+    isMarked(card[1][1]) &&
+    isMarked(card[2][2]) &&
+    isMarked(card[3][3]) &&
+    isMarked(card[4][4])
+  ) {
     return true;
   }
 
   // Other diagonal
-  let diagonal2 = true;
-
-  for (let i = 0; i < 5; i++) {
-    if (!isMarked(card[i][4 - i])) {
-      diagonal2 = false;
-      break;
-    }
+  if (
+    isMarked(card[0][4]) &&
+    isMarked(card[1][3]) &&
+    isMarked(card[2][2]) &&
+    isMarked(card[3][1]) &&
+    isMarked(card[4][0])
+  ) {
+    return true;
   }
 
-  return diagonal2;
+  return false;
 }
 
-// ==========================
-// /newgame
-// ==========================
-
-bot.command("newgame", async (ctx) => {
-  if (!ctx.chat) return;
-
-  const chatId = ctx.chat.id;
-  const hostId = ctx.from.id;
-  const hostName =
-    ctx.from.first_name ||
-    ctx.from.username ||
-    "Host";
-
+bot.command("newgame", async ctx => {
   try {
+    const chatId = ctx.chat.id;
+    const hostId = ctx.from.id;
+    const hostName =
+      ctx.from.first_name ||
+      ctx.from.username ||
+      "Host";
+
     await pool.query(
       `
       INSERT INTO games
@@ -186,40 +192,33 @@ bot.command("newgame", async (ctx) => {
     );
 
     await ctx.reply(
-      "🎱 New Bingo game started!\n\n" +
-      "Players can join with /join"
+      "🎉 New Bingo game created!\n\n" +
+      "Players can now use /join to get a card."
     );
   } catch (error) {
     console.error(error);
-    await ctx.reply("❌ Could not start the game.");
+    await ctx.reply("❌ Could not create the game.");
   }
 });
 
-// ==========================
-// /join
-// ==========================
-
-bot.command("join", async (ctx) => {
-  if (!ctx.chat || !ctx.from) return;
-
-  const chatId = ctx.chat.id;
-  const userId = ctx.from.id;
-  const name =
-    ctx.from.first_name ||
-    ctx.from.username ||
-    "Player";
-
+bot.command("join", async ctx => {
   try {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+    const name =
+      ctx.from.first_name ||
+      ctx.from.username ||
+      "Player";
+
     const gameResult = await pool.query(
       `SELECT * FROM games WHERE chat_id = $1`,
       [chatId]
     );
 
     if (gameResult.rows.length === 0) {
-      await ctx.reply(
-        "❌ No active game.\n\nUse /newgame first."
+      return ctx.reply(
+        "❌ There is no active game.\nUse /newgame first."
       );
-      return;
     }
 
     const existing = await pool.query(
@@ -232,10 +231,9 @@ bot.command("join", async (ctx) => {
     );
 
     if (existing.rows.length > 0) {
-      await ctx.reply(
-        "✅ You are already in the game.\n\nUse /play to open your card."
+      return ctx.reply(
+        "You already joined this game. Use /play to open your card."
       );
-      return;
     }
 
     const card = generateCard();
@@ -256,8 +254,8 @@ bot.command("join", async (ctx) => {
     );
 
     await ctx.reply(
-      `🎟️ ${name}, you joined the Bingo game!\n\n` +
-      "Use /play to open your Bingo card."
+      `🎫 ${name}, your Bingo card is ready!\n\n` +
+      `Use /play to open your card.`
     );
   } catch (error) {
     console.error(error);
@@ -265,14 +263,10 @@ bot.command("join", async (ctx) => {
   }
 });
 
-// ==========================
-// /players
-// ==========================
-
-bot.command("players", async (ctx) => {
-  if (!ctx.chat) return;
-
+bot.command("players", async ctx => {
   try {
+    const chatId = ctx.chat.id;
+
     const result = await pool.query(
       `
       SELECT name
@@ -280,63 +274,55 @@ bot.command("players", async (ctx) => {
       WHERE chat_id = $1
       ORDER BY name
       `,
-      [ctx.chat.id]
+      [chatId]
     );
 
     if (result.rows.length === 0) {
-      await ctx.reply("👥 No players yet.");
-      return;
+      return ctx.reply("No players have joined yet.");
     }
 
-    const list = result.rows
-      .map((player, index) => `${index + 1}. ${player.name}`)
-      .join("\n");
+    const text =
+      "👥 Players:\n\n" +
+      result.rows
+        .map((player, index) => `${index + 1}. ${player.name}`)
+        .join("\n");
 
-    await ctx.reply(
-      `👥 Players (${result.rows.length})\n\n${list}`
-    );
+    await ctx.reply(text);
   } catch (error) {
     console.error(error);
-    await ctx.reply("❌ Could not load players.");
+    await ctx.reply("❌ Could not get players.");
   }
 });
 
-// ==========================
-// /call
-// ==========================
-
-bot.command("call", async (ctx) => {
-  if (!ctx.chat) return;
-
-  const chatId = ctx.chat.id;
-
+bot.command("call", async ctx => {
   try {
+    const chatId = ctx.chat.id;
+
     const gameResult = await pool.query(
       `SELECT * FROM games WHERE chat_id = $1`,
       [chatId]
     );
 
     if (gameResult.rows.length === 0) {
-      await ctx.reply("❌ No active game.");
-      return;
+      return ctx.reply(
+        "❌ No active game. Use /newgame first."
+      );
     }
 
     const game = gameResult.rows[0];
 
     if (game.winner) {
-      await ctx.reply(
-        `🏆 Game already finished!\nWinner: ${game.winner}`
+      return ctx.reply(
+        `🏆 This game is already won by ${game.winner}.`
       );
-      return;
     }
 
     const calledNumbers = game.called_numbers || [];
 
     if (calledNumbers.length >= 75) {
-      await ctx.reply(
-        "🎱 All 75 numbers have been called."
+      return ctx.reply(
+        "All 75 numbers have already been called."
       );
-      return;
     }
 
     let number;
@@ -360,23 +346,9 @@ bot.command("call", async (ctx) => {
       ]
     );
 
-    let letter;
-
-    if (number <= 15) {
-      letter = "B";
-    } else if (number <= 30) {
-      letter = "I";
-    } else if (number <= 45) {
-      letter = "N";
-    } else if (number <= 60) {
-      letter = "G";
-    } else {
-      letter = "O";
-    }
-
     await ctx.reply(
-      `🎱 CALLED: ${letter}-${number}\n\n` +
-      `📊 ${calledNumbers.length}/75 numbers called`
+      `🎱 Called number: ${number}\n\n` +
+      `Numbers called: ${calledNumbers.length}/75`
     );
   } catch (error) {
     console.error(error);
@@ -384,52 +356,68 @@ bot.command("call", async (ctx) => {
   }
 });
 
-// ==========================
-// /play
-// ==========================
-
-bot.command("play", async (ctx) => {
-  if (!ctx.chat) return;
-
-  const chatId = ctx.chat.id;
-
-  const url =
-    `https://t.me/Rudivollerbingo_bot?startapp=${chatId}`;
-
-  await ctx.reply(
-    "🎟️ Open your Bingo card:\n\n" +
-    url
-  );
-});
-
-// ==========================
-// /bingo
-// ==========================
-
-bot.command("bingo", async (ctx) => {
-  if (!ctx.chat || !ctx.from) return;
-
-  const chatId = ctx.chat.id;
-  const userId = ctx.from.id;
-
+bot.command("play", async ctx => {
   try {
+    const chatId = ctx.chat.id;
+
     const gameResult = await pool.query(
       `SELECT * FROM games WHERE chat_id = $1`,
       [chatId]
     );
 
     if (gameResult.rows.length === 0) {
-      await ctx.reply("❌ No active game.");
-      return;
+      return ctx.reply(
+        "❌ No active game. Use /newgame first."
+      );
+    }
+
+    const playerResult = await pool.query(
+      `
+      SELECT *
+      FROM players
+      WHERE chat_id = $1 AND user_id = $2
+      `,
+      [chatId, ctx.from.id]
+    );
+
+    if (playerResult.rows.length === 0) {
+      return ctx.reply(
+        "❌ You have not joined this game yet.\nUse /join first."
+      );
+    }
+
+    const miniAppUrl =
+      `https://t.me/Rudivollerbingo_bot?startapp=${chatId}`;
+
+    await ctx.reply(
+      `🎫 Open your Bingo card:\n\n${miniAppUrl}`
+    );
+  } catch (error) {
+    console.error(error);
+    await ctx.reply("❌ Could not open the Bingo card.");
+  }
+});
+
+bot.command("bingo", async ctx => {
+  try {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+
+    const gameResult = await pool.query(
+      `SELECT * FROM games WHERE chat_id = $1`,
+      [chatId]
+    );
+
+    if (gameResult.rows.length === 0) {
+      return ctx.reply("❌ No active game.");
     }
 
     const game = gameResult.rows[0];
 
     if (game.winner) {
-      await ctx.reply(
-        `🏆 The game is already finished!\nWinner: ${game.winner}`
+      return ctx.reply(
+        `🏆 The game is already won by ${game.winner}.`
       );
-      return;
     }
 
     const playerResult = await pool.query(
@@ -442,10 +430,9 @@ bot.command("bingo", async (ctx) => {
     );
 
     if (playerResult.rows.length === 0) {
-      await ctx.reply(
-        "❌ You are not in this game.\nUse /join first."
+      return ctx.reply(
+        "❌ You are not in this game."
       );
-      return;
     }
 
     const player = playerResult.rows[0];
@@ -453,12 +440,332 @@ bot.command("bingo", async (ctx) => {
     const markedNumbers =
       player.marked_numbers || [];
 
-    if (!hasBingo(player.card, markedNumbers)) {
-      await ctx.reply(
-        "❌ No Bingo yet!\n\n" +
-        "You need a complete row, column, or diagonal."
+    const valid = checkBingo(
+      player.card,
+      markedNumbers
+    );
+
+    if (!valid) {
+      return ctx.reply(
+        "❌ No Bingo yet. Complete a row, column, or diagonal."
       );
-      return;
+    }
+
+    const winnerName = player.name;
+
+    await pool.query(
+      `
+      UPDATE games
+      SET winner = $1
+      WHERE chat_id = $2
+      `,
+      [winnerName, chatId]
+    );
+
+    await ctx.reply(
+      `🎉 BINGO!\n\n🏆 ${winnerName} wins the game!`
+    );
+  } catch (error) {
+    console.error(error);
+    await ctx.reply("❌ Could not check Bingo.");
+  }
+});
+
+bot.command("endgame", async ctx => {
+  try {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+
+    const gameResult = await pool.query(
+      `SELECT * FROM games WHERE chat_id = $1`,
+      [chatId]
+    );
+
+    if (gameResult.rows.length === 0) {
+      return ctx.reply("❌ No active game.");
+    }
+
+    const game = gameResult.rows[0];
+
+    if (String(game.host_id) !== String(userId)) {
+      return ctx.reply(
+        "❌ Only the game host can end the game."
+      );
+    }
+
+    await pool.query(
+      `DELETE FROM games WHERE chat_id = $1`,
+      [chatId]
+    );
+
+    await ctx.reply(
+      "🛑 Bingo game ended."
+    );
+  } catch (error) {
+    console.error(error);
+    await ctx.reply("❌ Could not end the game.");
+  }
+});
+
+/*
+  API
+*/
+
+async function getCard(req, res) {
+  try {
+    const url = new URL(
+      req.url,
+      `http://${req.headers.host}`
+    );
+
+    const chatId = url.searchParams.get("chatId");
+    const userId = url.searchParams.get("userId");
+
+    if (!chatId || !userId) {
+      return sendJson(res, 400, {
+        error: "Missing chatId or userId"
+      });
+    }
+
+    const gameResult = await pool.query(
+      `SELECT * FROM games WHERE chat_id = $1`,
+      [chatId]
+    );
+
+    if (gameResult.rows.length === 0) {
+      return sendJson(res, 404, {
+        error: "Game not found"
+      });
+    }
+
+    const playerResult = await pool.query(
+      `
+      SELECT *
+      FROM players
+      WHERE chat_id = $1 AND user_id = $2
+      `,
+      [chatId, userId]
+    );
+
+    if (playerResult.rows.length === 0) {
+      return sendJson(res, 404, {
+        error: "Player not found"
+      });
+    }
+
+    const game = gameResult.rows[0];
+    const player = playerResult.rows[0];
+
+    const countResult = await pool.query(
+      `
+      SELECT COUNT(*)::int AS count
+      FROM players
+      WHERE chat_id = $1
+      `,
+      [chatId]
+    );
+
+    return sendJson(res, 200, {
+      name: player.name,
+      hostName: game.host_name,
+      playerCount: countResult.rows[0].count,
+      card: player.card,
+      markedNumbers: player.marked_numbers || [],
+      calledNumbers: game.called_numbers || [],
+      winner: game.winner
+    });
+  } catch (error) {
+    console.error(error);
+
+    return sendJson(res, 500, {
+      error: "Server error"
+    });
+  }
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+
+    req.on("data", chunk => {
+      body += chunk;
+    });
+
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(body || "{}"));
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    req.on("error", reject);
+  });
+}
+
+async function markNumber(req, res, shouldMark) {
+  try {
+    const body = await readBody(req);
+
+    const chatId = body.chatId;
+    const userId = body.userId;
+    const number = Number(body.number);
+
+    if (
+      !chatId ||
+      !userId ||
+      !Number.isInteger(number) ||
+      number < 1 ||
+      number > 75
+    ) {
+      return sendJson(res, 400, {
+        error: "Invalid data"
+      });
+    }
+
+    const playerResult = await pool.query(
+      `
+      SELECT *
+      FROM players
+      WHERE chat_id = $1 AND user_id = $2
+      `,
+      [chatId, userId]
+    );
+
+    if (playerResult.rows.length === 0) {
+      return sendJson(res, 404, {
+        error: "Player not found"
+      });
+    }
+
+    const player = playerResult.rows[0];
+
+    if (!cardContainsNumber(player.card, number)) {
+      return sendJson(res, 400, {
+        error: "Number is not on your card"
+      });
+    }
+
+    const gameResult = await pool.query(
+      `SELECT * FROM games WHERE chat_id = $1`,
+      [chatId]
+    );
+
+    if (gameResult.rows.length === 0) {
+      return sendJson(res, 404, {
+        error: "Game not found"
+      });
+    }
+
+    const game = gameResult.rows[0];
+    const calledNumbers = game.called_numbers || [];
+
+    if (!calledNumbers.includes(number)) {
+      return sendJson(res, 400, {
+        error: "Number has not been called"
+      });
+    }
+
+    let markedNumbers =
+      player.marked_numbers || [];
+
+    if (shouldMark) {
+      if (!markedNumbers.includes(number)) {
+        markedNumbers.push(number);
+      }
+    } else {
+      markedNumbers =
+        markedNumbers.filter(n => n !== number);
+    }
+
+    await pool.query(
+      `
+      UPDATE players
+      SET marked_numbers = $1
+      WHERE chat_id = $2 AND user_id = $3
+      `,
+      [
+        JSON.stringify(markedNumbers),
+        chatId,
+        userId
+      ]
+    );
+
+    return sendJson(res, 200, {
+      success: true,
+      markedNumbers
+    });
+  } catch (error) {
+    console.error(error);
+
+    return sendJson(res, 500, {
+      error: "Server error"
+    });
+  }
+}
+
+async function bingoApi(req, res) {
+  try {
+    const body = await readBody(req);
+
+    const chatId = body.chatId;
+    const userId = body.userId;
+
+    if (!chatId || !userId) {
+      return sendJson(res, 400, {
+        error: "Missing chatId or userId"
+      });
+    }
+
+    const gameResult = await pool.query(
+      `SELECT * FROM games WHERE chat_id = $1`,
+      [chatId]
+    );
+
+    if (gameResult.rows.length === 0) {
+      return sendJson(res, 404, {
+        error: "Game not found"
+      });
+    }
+
+    const game = gameResult.rows[0];
+
+    if (game.winner) {
+      return sendJson(res, 200, {
+        bingo: true,
+        winner: game.winner
+      });
+    }
+
+    const playerResult = await pool.query(
+      `
+      SELECT *
+      FROM players
+      WHERE chat_id = $1 AND user_id = $2
+      `,
+      [chatId, userId]
+    );
+
+    if (playerResult.rows.length === 0) {
+      return sendJson(res, 404, {
+        error: "Player not found"
+      });
+    }
+
+    const player = playerResult.rows[0];
+
+    const markedNumbers =
+      player.marked_numbers || [];
+
+    const valid = checkBingo(
+      player.card,
+      markedNumbers
+    );
+
+    if (!valid) {
+      return sendJson(res, 200, {
+        bingo: false
+      });
     }
 
     await pool.query(
@@ -470,559 +777,111 @@ bot.command("bingo", async (ctx) => {
       [player.name, chatId]
     );
 
-    await ctx.reply(
-      `🏆 BINGO!\n\n` +
-      `🎉 Winner: ${player.name}`
+    await bot.telegram.sendMessage(
+      chatId,
+      `🎉 BINGO!\n\n🏆 ${player.name} wins the game!`
     );
+
+    return sendJson(res, 200, {
+      bingo: true,
+      winner: player.name
+    });
   } catch (error) {
     console.error(error);
-    await ctx.reply("❌ Could not verify Bingo.");
+
+    return sendJson(res, 500, {
+      error: "Server error"
+    });
   }
-});
+}
 
-// ==========================
-// /endgame
-// ==========================
+function sendJson(res, status, data) {
+  res.writeHead(status, {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*"
+  });
 
-bot.command("endgame", async (ctx) => {
-  if (!ctx.chat || !ctx.from) return;
+  res.end(JSON.stringify(data));
+}
 
-  try {
-    const result = await pool.query(
-      `SELECT * FROM games WHERE chat_id = $1`,
-      [ctx.chat.id]
-    );
+function serveMiniApp(res) {
+  const filePath = path.join(
+    __dirname,
+    "miniapp",
+    "index.html"
+  );
 
-    if (result.rows.length === 0) {
-      await ctx.reply("❌ No active game.");
-      return;
-    }
+  fs.readFile(filePath, "utf8", (error, data) => {
+    if (error) {
+      console.error(error);
 
-    const game = result.rows[0];
+      res.writeHead(500, {
+        "Content-Type": "text/plain"
+      });
 
-    if (Number(game.host_id) !== Number(ctx.from.id)) {
-      await ctx.reply(
-        "❌ Only the game host can end the game."
+      return res.end(
+        "Mini App file could not be loaded."
       );
-      return;
     }
 
-    await pool.query(
-      `DELETE FROM games WHERE chat_id = $1`,
-      [ctx.chat.id]
-    );
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8"
+    });
 
-    await ctx.reply("🛑 Bingo game ended.");
-  } catch (error) {
-    console.error(error);
-    await ctx.reply("❌ Could not end the game.");
-  }
-});
-
-// ==========================
-// HTTP SERVER
-// ==========================
-
-const miniAppPath = path.join(
-  __dirname,
-  "miniapp",
-  "index.html"
-);
+    res.end(data);
+  });
+}
 
 const server = http.createServer(async (req, res) => {
   try {
-    // Mini App
-    if (req.url === "/miniapp" || req.url === "/miniapp/") {
-      const html = fs.readFileSync(
-        miniAppPath,
-        "utf8"
-      );
+    const url = new URL(
+      req.url,
+      `http://${req.headers.host}`
+    );
 
-      res.writeHead(200, {
-        "Content-Type": "text/html; charset=utf-8"
-      });
-
-      res.end(html);
-      return;
+    // IMPORTANT:
+    // Both / and /miniapp now open the Mini App.
+    if (
+      req.method === "GET" &&
+      (url.pathname === "/" ||
+        url.pathname === "/miniapp")
+    ) {
+      return serveMiniApp(res);
     }
 
-    // ==========================
-    // GET CARD
-    // ==========================
-
-    if (req.url.startsWith("/api/card")) {
-      const url = new URL(
-        req.url,
-        `http://${req.headers.host}`
-      );
-
-      const chatId = url.searchParams.get("chatId");
-      const userId = url.searchParams.get("userId");
-
-      if (!chatId || !userId) {
-        res.writeHead(400, {
-          "Content-Type": "application/json"
-        });
-
-        res.end(
-          JSON.stringify({
-            error: "Missing chatId or userId"
-          })
-        );
-
-        return;
-      }
-
-      const gameResult = await pool.query(
-        `
-        SELECT
-          host_name,
-          called_numbers,
-          winner
-        FROM games
-        WHERE chat_id = $1
-        `,
-        [chatId]
-      );
-
-      if (gameResult.rows.length === 0) {
-        res.writeHead(404, {
-          "Content-Type": "application/json"
-        });
-
-        res.end(
-          JSON.stringify({
-            error: "Game not found"
-          })
-        );
-
-        return;
-      }
-
-      const game = gameResult.rows[0];
-
-      const playerResult = await pool.query(
-        `
-        SELECT
-          name,
-          card,
-          marked_numbers
-        FROM players
-        WHERE chat_id = $1 AND user_id = $2
-        `,
-        [chatId, userId]
-      );
-
-      if (playerResult.rows.length === 0) {
-        res.writeHead(404, {
-          "Content-Type": "application/json"
-        });
-
-        res.end(
-          JSON.stringify({
-            error: "Player not found"
-          })
-        );
-
-        return;
-      }
-
-      const player = playerResult.rows[0];
-
-      const countResult = await pool.query(
-        `
-        SELECT COUNT(*) AS count
-        FROM players
-        WHERE chat_id = $1
-        `,
-        [chatId]
-      );
-
-      const playerCount =
-        Number(countResult.rows[0].count);
-
-      res.writeHead(200, {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      });
-
-      res.end(
-        JSON.stringify({
-          name: player.name,
-          hostName: game.host_name,
-          playerCount: playerCount,
-          card: player.card,
-          markedNumbers: player.marked_numbers || [],
-          calledNumbers: game.called_numbers || [],
-          winner: game.winner
-        })
-      );
-
-      return;
+    if (
+      req.method === "GET" &&
+      url.pathname === "/api/card"
+    ) {
+      return getCard(req, res);
     }
-
-    // ==========================
-    // SAVE MARK
-    // ==========================
 
     if (
       req.method === "POST" &&
-      req.url === "/api/mark"
+      url.pathname === "/api/mark"
     ) {
-      let body = "";
-
-      req.on("data", chunk => {
-        body += chunk.toString();
-      });
-
-      req.on("end", async () => {
-        try {
-          const data = JSON.parse(body);
-
-          const chatId = data.chatId;
-          const userId = data.userId;
-          const number = data.number;
-
-          if (!chatId || !userId || number === undefined) {
-            res.writeHead(400, {
-              "Content-Type": "application/json"
-            });
-
-            res.end(
-              JSON.stringify({
-                error: "Missing data"
-              })
-            );
-
-            return;
-          }
-
-          const playerResult = await pool.query(
-            `
-            SELECT marked_numbers
-            FROM players
-            WHERE chat_id = $1 AND user_id = $2
-            `,
-            [chatId, userId]
-          );
-
-          if (playerResult.rows.length === 0) {
-            res.writeHead(404, {
-              "Content-Type": "application/json"
-            });
-
-            res.end(
-              JSON.stringify({
-                error: "Player not found"
-              })
-            );
-
-            return;
-          }
-
-          let marked =
-            playerResult.rows[0].marked_numbers || [];
-
-          const numberString = String(number);
-
-          if (!marked.map(String).includes(numberString)) {
-            marked.push(number);
-          }
-
-          await pool.query(
-            `
-            UPDATE players
-            SET marked_numbers = $1
-            WHERE chat_id = $2 AND user_id = $3
-            `,
-            [
-              JSON.stringify(marked),
-              chatId,
-              userId
-            ]
-          );
-
-          res.writeHead(200, {
-            "Content-Type": "application/json"
-          });
-
-          res.end(
-            JSON.stringify({
-              success: true,
-              markedNumbers: marked
-            })
-          );
-        } catch (error) {
-          console.error(error);
-
-          res.writeHead(500, {
-            "Content-Type": "application/json"
-          });
-
-          res.end(
-            JSON.stringify({
-              error: "Server error"
-            })
-          );
-        }
-      });
-
-      return;
+      return markNumber(req, res, true);
     }
-
-    // ==========================
-    // UNMARK
-    // ==========================
 
     if (
       req.method === "POST" &&
-      req.url === "/api/unmark"
+      url.pathname === "/api/unmark"
     ) {
-      let body = "";
-
-      req.on("data", chunk => {
-        body += chunk.toString();
-      });
-
-      req.on("end", async () => {
-        try {
-          const data = JSON.parse(body);
-
-          const chatId = data.chatId;
-          const userId = data.userId;
-          const number = data.number;
-
-          if (!chatId || !userId || number === undefined) {
-            res.writeHead(400, {
-              "Content-Type": "application/json"
-            });
-
-            res.end(
-              JSON.stringify({
-                error: "Missing data"
-              })
-            );
-
-            return;
-          }
-
-          const playerResult = await pool.query(
-            `
-            SELECT marked_numbers
-            FROM players
-            WHERE chat_id = $1 AND user_id = $2
-            `,
-            [chatId, userId]
-          );
-
-          if (playerResult.rows.length === 0) {
-            res.writeHead(404, {
-              "Content-Type": "application/json"
-            });
-
-            res.end(
-              JSON.stringify({
-                error: "Player not found"
-              })
-            );
-
-            return;
-          }
-
-          let marked =
-            playerResult.rows[0].marked_numbers || [];
-
-          marked = marked.filter(
-            value => String(value) !== String(number)
-          );
-
-          await pool.query(
-            `
-            UPDATE players
-            SET marked_numbers = $1
-            WHERE chat_id = $2 AND user_id = $3
-            `,
-            [
-              JSON.stringify(marked),
-              chatId,
-              userId
-            ]
-          );
-
-          res.writeHead(200, {
-            "Content-Type": "application/json"
-          });
-
-          res.end(
-            JSON.stringify({
-              success: true,
-              markedNumbers: marked
-            })
-          );
-        } catch (error) {
-          console.error(error);
-
-          res.writeHead(500, {
-            "Content-Type": "application/json"
-          });
-
-          res.end(
-            JSON.stringify({
-              error: "Server error"
-            })
-          );
-        }
-      });
-
-      return;
+      return markNumber(req, res, false);
     }
 
-    // ==========================
-    // BINGO API
-    // ==========================
-
-    if (req.url.startsWith("/api/bingo")) {
-      const url = new URL(
-        req.url,
-        `http://${req.headers.host}`
-      );
-
-      const chatId = url.searchParams.get("chatId");
-      const userId = url.searchParams.get("userId");
-
-      if (!chatId || !userId) {
-        res.writeHead(400, {
-          "Content-Type": "application/json"
-        });
-
-        res.end(
-          JSON.stringify({
-            error: "Missing chatId or userId"
-          })
-        );
-
-        return;
-      }
-
-      const gameResult = await pool.query(
-        `SELECT * FROM games WHERE chat_id = $1`,
-        [chatId]
-      );
-
-      if (gameResult.rows.length === 0) {
-        res.writeHead(404, {
-          "Content-Type": "application/json"
-        });
-
-        res.end(
-          JSON.stringify({
-            error: "Game not found"
-          })
-        );
-
-        return;
-      }
-
-      const game = gameResult.rows[0];
-
-      if (game.winner) {
-        res.writeHead(200, {
-          "Content-Type": "application/json"
-        });
-
-        res.end(
-          JSON.stringify({
-            bingo: true,
-            winner: game.winner
-          })
-        );
-
-        return;
-      }
-
-      const playerResult = await pool.query(
-        `
-        SELECT *
-        FROM players
-        WHERE chat_id = $1 AND user_id = $2
-        `,
-        [chatId, userId]
-      );
-
-      if (playerResult.rows.length === 0) {
-        res.writeHead(404, {
-          "Content-Type": "application/json"
-        });
-
-        res.end(
-          JSON.stringify({
-            error: "Player not found"
-          })
-        );
-
-        return;
-      }
-
-      const player = playerResult.rows[0];
-
-      const bingo = hasBingo(
-        player.card,
-        player.marked_numbers || []
-      );
-
-      if (bingo) {
-        await pool.query(
-          `
-          UPDATE games
-          SET winner = $1
-          WHERE chat_id = $2
-          `,
-          [player.name, chatId]
-        );
-
-        try {
-          await bot.telegram.sendMessage(
-            chatId,
-            `🏆 BINGO!\n\n🎉 Winner: ${player.name}`
-          );
-        } catch (error) {
-          console.error(
-            "Could not announce winner:",
-            error
-          );
-        }
-
-        res.writeHead(200, {
-          "Content-Type": "application/json"
-        });
-
-        res.end(
-          JSON.stringify({
-            bingo: true,
-            winner: player.name
-          })
-        );
-      } else {
-        res.writeHead(200, {
-          "Content-Type": "application/json"
-        });
-
-        res.end(
-          JSON.stringify({
-            bingo: false
-          })
-        );
-      }
-
-      return;
+    if (
+      req.method === "POST" &&
+      url.pathname === "/api/bingo"
+    ) {
+      return bingoApi(req, res);
     }
 
-    // Health check
-    res.writeHead(200, {
+    res.writeHead(404, {
       "Content-Type": "text/plain"
     });
 
-    res.end("Telegram Bingo Bot is running!");
+    res.end("Not found");
   } catch (error) {
     console.error(error);
 
@@ -1034,28 +893,32 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// ==========================
-// START
-// ==========================
-
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+async function start() {
+  try {
+    await initDatabase();
 
-initDatabase()
-  .then(() => {
-    bot.launch();
-    console.log("Bot started");
-  })
-  .catch(error => {
+    await bot.launch();
+
+    server.listen(PORT, () => {
+      console.log(
+        `HTTP server running on port ${PORT}`
+      );
+    });
+
+    console.log("Telegram bot started");
+  } catch (error) {
     console.error(
-      "Database initialization failed:",
+      "Failed to start application:",
       error
     );
+
     process.exit(1);
-  });
+  }
+}
+
+start();
 
 process.once("SIGINT", () => {
   bot.stop("SIGINT");
