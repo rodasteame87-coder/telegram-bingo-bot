@@ -1,12 +1,15 @@
-const { Telegraf, Markup } = require("telegraf");
+const { Telegraf } = require("telegraf");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const PORT = process.env.PORT || 3000;
+
 const MINIAPP_URL =
   "https://telegram-bingo-bot-q54q.onrender.com/miniapp";
+
+const BOT_USERNAME = "Rudivollerbingo_bot";
 
 if (!BOT_TOKEN) {
   console.error("BOT_TOKEN is missing!");
@@ -14,6 +17,7 @@ if (!BOT_TOKEN) {
 }
 
 const bot = new Telegraf(BOT_TOKEN);
+
 const games = new Map();
 
 function createBingoCard() {
@@ -56,6 +60,7 @@ function createBingoCard() {
 
 function formatCard(card) {
   let text = "🎟️ YOUR BINGO CARD\n\n";
+
   text += " B    I    N    G    O\n";
   text += "----------------------\n";
 
@@ -95,9 +100,7 @@ function hasBingo(card, calledNumbers) {
       }
     }
 
-    if (complete) {
-      return true;
-    }
+    if (complete) return true;
   }
 
   for (let column = 0; column < 5; column++) {
@@ -110,9 +113,7 @@ function hasBingo(card, calledNumbers) {
       }
     }
 
-    if (complete) {
-      return true;
-    }
+    if (complete) return true;
   }
 
   let diagonal1 = true;
@@ -124,9 +125,7 @@ function hasBingo(card, calledNumbers) {
     }
   }
 
-  if (diagonal1) {
-    return true;
-  }
+  if (diagonal1) return true;
 
   let diagonal2 = true;
 
@@ -170,9 +169,9 @@ bot.command("newgame", (ctx) => {
   });
 
   ctx.reply(
-    `🎱 NEW BINGO GAME!\n\n` +
+    "🎱 NEW BINGO GAME!\n\n" +
       `👑 Host: ${ctx.from.first_name}\n\n` +
-      `Players can now use /join`
+      "Players can now use /join"
   );
 });
 
@@ -231,7 +230,7 @@ bot.command("players", (ctx) => {
   ctx.reply(text);
 });
 
-bot.command("play", async (ctx) => {
+bot.command("play", (ctx) => {
   const chatId = ctx.chat.id;
   const game = games.get(chatId);
 
@@ -247,17 +246,12 @@ bot.command("play", async (ctx) => {
     );
   }
 
-  const appUrl =
-    `${MINIAPP_URL}?chatId=${encodeURIComponent(chatId)}`;
+  const link =
+    `https://t.me/${BOT_USERNAME}?startapp=${encodeURIComponent(chatId)}`;
 
-  await ctx.reply(
-    "🎱 Open your Bingo card below:",
-    Markup.inlineKeyboard([
-      Markup.button.webApp(
-        "🎱 Open My Bingo Card",
-        appUrl
-      )
-    ])
+  ctx.reply(
+    "🎱 Open your Bingo card:\n\n" +
+      link
   );
 });
 
@@ -295,7 +289,7 @@ bot.command("call", (ctx) => {
   game.calledNumbers.push(number);
 
   ctx.reply(
-    `🎱 NUMBER CALLED!\n\n` +
+    "🎱 NUMBER CALLED!\n\n" +
       `🔔 ${getLetter(number)}-${number}\n\n` +
       `📊 ${game.calledNumbers.length}/75 numbers called`
   );
@@ -337,7 +331,7 @@ bot.command("bingo", (ctx) => {
   game.winner = player.name;
 
   ctx.reply(
-    `🏆🎉 BINGO! 🎉🏆\n\n` +
+    "🏆🎉 BINGO! 🎉🏆\n\n" +
       `${player.name} has won the game!\n\n` +
       `🎱 Numbers called: ${game.calledNumbers.length}`
   );
