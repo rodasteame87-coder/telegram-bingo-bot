@@ -1,6 +1,8 @@
 const { Telegraf } = require("telegraf");
+const http = require("http");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
+const PORT = process.env.PORT || 3000;
 
 if (!BOT_TOKEN) {
   console.error("BOT_TOKEN is missing!");
@@ -30,6 +32,15 @@ bot.command("help", (ctx) => {
     "/bingo - Start a Bingo game\n" +
     "/help - Show help"
   );
+});
+
+const server = http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("Bingo bot is running!");
+});
+
+server.listen(PORT, () => {
+  console.log(`🌐 Web server running on port ${PORT}`);
 });
 
 bot.launch();
