@@ -1,8 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0"
@@ -13,7 +12,6 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <style>
-
     * {
       box-sizing: border-box;
     }
@@ -21,120 +19,84 @@
     body {
       margin: 0;
       padding: 15px;
+      background: #111827;
+      color: white;
       font-family: Arial, sans-serif;
-      background: #f1f3f6;
-      color: #222;
       text-align: center;
     }
 
-    .top {
-      max-width: 430px;
-      margin: auto;
-    }
-
     h1 {
-      margin: 5px 0;
-      font-size: 32px;
+      margin: 5px 0 15px;
     }
 
-    #playerName {
-      font-size: 17px;
-      margin-bottom: 12px;
-      color: #555;
+    .info {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 15px;
     }
 
-    .game-info {
-      background: white;
-      border-radius: 15px;
-      padding: 12px;
-      margin-bottom: 12px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.10);
-      text-align: left;
+    .infoBox {
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 10px 5px;
+      font-size: 13px;
     }
 
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 2px;
-      font-size: 15px;
-    }
-
-    .info-label {
-      color: #777;
-    }
-
-    .info-value {
-      font-weight: bold;
-    }
-
-    .last-called {
-      background: white;
-      border-radius: 18px;
-      padding: 15px;
-      margin-bottom: 12px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.12);
-    }
-
-    .last-title {
-      font-size: 14px;
-      font-weight: bold;
-      color: #777;
-      margin-bottom: 5px;
-    }
-
-    #latest {
-      font-size: 42px;
-      font-weight: bold;
-      color: #e53935;
-    }
-
-    #counter {
+    .infoValue {
+      display: block;
       margin-top: 5px;
       font-size: 15px;
-      color: #666;
+      font-weight: bold;
     }
 
-    #status {
-      margin: 10px 0;
+    .lastCalled {
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 15px;
+    }
+
+    .lastNumber {
+      font-size: 28px;
       font-weight: bold;
+      margin-top: 5px;
     }
 
     .board {
-      max-width: 430px;
-      margin: auto;
-
-      display: grid;
-
-      grid-template-columns:
-        repeat(5, 1fr);
-
-      gap: 6px;
+      max-width: 420px;
+      margin: 0 auto;
     }
 
-    .header {
-      background: #222;
-      color: white;
-      border-radius: 8px;
-      padding: 10px 0;
-      font-size: 19px;
+    .letters {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+      margin-bottom: 5px;
+    }
+
+    .letter {
+      font-size: 20px;
       font-weight: bold;
+      padding: 8px;
+    }
+
+    .card {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
     }
 
     .cell {
-      background: white;
-      border-radius: 9px;
-      min-height: 58px;
-
+      aspect-ratio: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-
-      font-size: 18px;
+      border-radius: 10px;
+      background: #374151;
+      border: 2px solid #4b5563;
+      font-size: 19px;
       font-weight: bold;
-
-      box-shadow:
-        0 2px 5px rgba(0,0,0,0.12);
-
       cursor: pointer;
       user-select: none;
     }
@@ -155,666 +117,456 @@
       background: #ffcc00;
       color: #111;
       border: 2px solid #ffcc00;
+      cursor: default;
     }
 
-    .called-box {
-      max-width: 430px;
-      margin: 15px auto;
-
-      background: white;
-
-      border-radius: 15px;
-
+    .calledNumbers {
+      margin-top: 20px;
+      background: #1f2937;
+      border-radius: 12px;
       padding: 12px;
-
-      box-shadow:
-        0 3px 10px rgba(0,0,0,0.10);
+      text-align: left;
     }
 
-    .called-title {
-      font-weight: bold;
-      margin-bottom: 8px;
+    .numbers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
     }
 
     .number {
-      display: inline-block;
-
-      margin: 3px;
-
-      padding: 6px 8px;
-
-      border-radius: 7px;
-
-      background: #e5e7eb;
-
+      background: #374151;
+      border-radius: 8px;
+      padding: 7px 9px;
       font-size: 13px;
-      font-weight: bold;
     }
 
-    button {
+    .bingoButton {
       width: 100%;
-      max-width: 430px;
-
-      margin-top: 5px;
-
-      padding: 17px;
-
+      max-width: 420px;
+      margin-top: 18px;
+      padding: 15px;
       border: none;
-
-      border-radius: 14px;
-
-      background: #e53935;
-
+      border-radius: 12px;
+      background: #35c759;
       color: white;
-
-      font-size: 21px;
-
+      font-size: 20px;
       font-weight: bold;
-
-      box-shadow:
-        0 4px 10px rgba(0,0,0,0.15);
+      cursor: pointer;
     }
 
-    button:active {
+    .bingoButton:active {
       transform: scale(0.98);
     }
 
-    #message {
-      max-width: 430px;
-
-      margin: 15px auto;
-
-      font-size: 18px;
-
+    .winner {
+      background: #ffcc00;
+      color: #111;
+      padding: 15px;
+      border-radius: 12px;
+      margin-top: 15px;
       font-weight: bold;
     }
 
-    .help {
-      max-width: 430px;
-
-      margin: 15px auto 5px;
-
-      font-size: 13px;
-
-      color: #777;
+    .message {
+      margin-top: 10px;
+      min-height: 22px;
+      font-size: 14px;
     }
-
   </style>
 </head>
 
 <body>
 
-  <div class="top">
+  <h1>🎱 BINGO</h1>
 
-    <h1>🎱 BINGO</h1>
+  <div class="info">
 
-    <div id="playerName">
-      Loading player...
+    <div class="infoBox">
+      👑 Host
+      <span
+        id="hostName"
+        class="infoValue"
+      >
+        Loading...
+      </span>
     </div>
 
-    <div class="game-info">
-
-      <div class="info-row">
-
-        <span class="info-label">
-          👑 Host
-        </span>
-
-        <span
-          class="info-value"
-          id="hostName"
-        >
-          Loading...
-        </span>
-
-      </div>
-
-      <div class="info-row">
-
-        <span class="info-label">
-          👥 Players
-        </span>
-
-        <span
-          class="info-value"
-          id="playerCount"
-        >
-          0
-        </span>
-
-      </div>
-
-      <div class="info-row">
-
-        <span class="info-label">
-          🎱 Numbers called
-        </span>
-
-        <span
-          class="info-value"
-          id="calledCount"
-        >
-          0/75
-        </span>
-
-      </div>
-
+    <div class="infoBox">
+      👥 Players
+      <span
+        id="playerCount"
+        class="infoValue"
+      >
+        0
+      </span>
     </div>
 
-
-    <div class="last-called">
-
-      <div class="last-title">
-        🔔 LAST CALLED
-      </div>
-
-      <div id="latest">
-        --
-      </div>
-
-      <div id="counter">
-        0/75 numbers called
-      </div>
-
-    </div>
-
-    <div id="status">
-      🔄 Loading game...
+    <div class="infoBox">
+      🎱 Called
+      <span
+        id="calledCount"
+        class="infoValue"
+      >
+        0/75
+      </span>
     </div>
 
   </div>
 
+  <div class="infoBox" style="margin-bottom:15px;">
+    👤 You
+    <span
+      id="playerName"
+      class="infoValue"
+    >
+      Loading...
+    </span>
+  </div>
+
+  <div class="lastCalled">
+    Last called number
+    <div
+      id="lastCalled"
+      class="lastNumber"
+    >
+      —
+    </div>
+  </div>
 
   <div class="board">
 
-    <div class="header">B</div>
-    <div class="header">I</div>
-    <div class="header">N</div>
-    <div class="header">G</div>
-    <div class="header">O</div>
+    <div class="letters">
+      <div class="letter">B</div>
+      <div class="letter">I</div>
+      <div class="letter">N</div>
+      <div class="letter">G</div>
+      <div class="letter">O</div>
+    </div>
 
-    <div id="cell-0-0" class="cell"></div>
-    <div id="cell-0-1" class="cell"></div>
-    <div id="cell-0-2" class="cell"></div>
-    <div id="cell-0-3" class="cell"></div>
-    <div id="cell-0-4" class="cell"></div>
-
-    <div id="cell-1-0" class="cell"></div>
-    <div id="cell-1-1" class="cell"></div>
-    <div id="cell-1-2" class="cell"></div>
-    <div id="cell-1-3" class="cell"></div>
-    <div id="cell-1-4" class="cell"></div>
-
-    <div id="cell-2-0" class="cell"></div>
-    <div id="cell-2-1" class="cell"></div>
-    <div id="cell-2-2" class="cell"></div>
-    <div id="cell-2-3" class="cell"></div>
-    <div id="cell-2-4" class="cell"></div>
-
-    <div id="cell-3-0" class="cell"></div>
-    <div id="cell-3-1" class="cell"></div>
-    <div id="cell-3-2" class="cell"></div>
-    <div id="cell-3-3" class="cell"></div>
-    <div id="cell-3-4" class="cell"></div>
-
-    <div id="cell-4-0" class="cell"></div>
-    <div id="cell-4-1" class="cell"></div>
-    <div id="cell-4-2" class="cell"></div>
-    <div id="cell-4-3" class="cell"></div>
-    <div id="cell-4-4" class="cell"></div>
+    <div
+      id="card"
+      class="card"
+    ></div>
 
   </div>
 
+  <div class="calledNumbers">
 
-  <div class="called-box">
+    <strong>🎱 Called Numbers</strong>
 
-    <div class="called-title">
-      📢 CALLED NUMBERS
-    </div>
-
-    <div id="calledNumbers">
-      No numbers yet
+    <div
+      id="numbers"
+      class="numbers"
+    >
+      —
     </div>
 
   </div>
 
-
-  <button onclick="claimBingo()">
+  <button
+    id="bingoButton"
+    class="bingoButton"
+  >
     🏆 BINGO!
   </button>
 
+  <div
+    id="winner"
+    class="winner"
+    style="display:none;"
+  ></div>
 
-  <div id="message"></div>
-
-
-  <div class="help">
-    ⚪ Called &nbsp; 🟢 Your mark &nbsp; 🟡 FREE
-  </div>
-
+  <div
+    id="message"
+    class="message"
+  ></div>
 
   <script>
-
-    const tg =
-      window.Telegram.WebApp;
+    const tg = window.Telegram.WebApp;
 
     tg.expand();
-
 
     const userId =
       tg.initDataUnsafe?.user?.id;
 
-
     const chatId =
       tg.initDataUnsafe?.start_param || "";
 
-
     let card = [];
-
-    let markedNumbers =
-      new Set();
-
+    let calledNumbers = [];
+    let markedNumbers = new Set();
 
     async function loadCard() {
-
-      if (!chatId || !userId) {
-
-        document.getElementById(
-          "status"
-        ).innerText =
+      if (!userId || !chatId) {
+        document.getElementById("message").innerText =
           "❌ Could not identify the game.";
-
         return;
       }
 
-
       try {
+        const response = await fetch(
+          `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(userId)}`
+        );
 
-        const response =
-          await fetch(
-            `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(userId)}`
-          );
-
-
-        const data =
-          await response.json();
-
+        const data = await response.json();
 
         if (!response.ok) {
+          document.getElementById("message").innerText =
+            "❌ " + (data.error || "Could not load card.");
+          return;
+        }
+
+        card = data.card || [];
+        calledNumbers = data.calledNumbers || [];
+
+        // Load saved marks from PostgreSQL.
+        markedNumbers = new Set(
+          (data.markedNumbers || []).map(String)
+        );
+
+        document.getElementById("playerName").innerText =
+          "👤 " + data.name;
+
+        document.getElementById("hostName").innerText =
+          data.hostName || "Unknown";
+
+        document.getElementById("playerCount").innerText =
+          data.playerCount || 0;
+
+        document.getElementById("calledCount").innerText =
+          calledNumbers.length + "/75";
+
+        if (calledNumbers.length > 0) {
+          const last =
+            calledNumbers[calledNumbers.length - 1];
+
+          document.getElementById("lastCalled").innerText =
+            last;
+        } else {
+          document.getElementById("lastCalled").innerText =
+            "—";
+        }
+
+        displayCard();
+        displayCalledNumbers();
+
+        if (data.winner) {
+          const winnerBox =
+            document.getElementById("winner");
+
+          winnerBox.style.display = "block";
+
+          winnerBox.innerText =
+            `🏆 Winner: ${data.winner}`;
 
           document.getElementById(
-            "status"
-          ).innerText =
-            "❌ " +
-            (
-              data.error ||
-              "Could not load game."
+            "bingoButton"
+          ).disabled = true;
+        }
+
+      } catch (error) {
+        console.error(error);
+
+        document.getElementById("message").innerText =
+          "❌ Connection error.";
+      }
+    }
+
+    function displayCard() {
+      const cardElement =
+        document.getElementById("card");
+
+      cardElement.innerHTML = "";
+
+      for (let row = 0; row < 5; row++) {
+        for (let col = 0; col < 5; col++) {
+
+          const value = card[row][col];
+
+          const cell =
+            document.createElement("div");
+
+          cell.className = "cell";
+
+          cell.innerText = value;
+
+          if (value === "FREE") {
+
+            cell.classList.add("free");
+
+          } else if (
+            markedNumbers.has(String(value))
+          ) {
+
+            cell.classList.add("marked");
+
+          } else if (
+            calledNumbers.includes(Number(value))
+          ) {
+
+            cell.classList.add("called");
+          }
+
+          if (value !== "FREE") {
+            cell.addEventListener(
+              "click",
+              () => toggleMark(value)
             );
+          }
+
+          cardElement.appendChild(cell);
+        }
+      }
+    }
+
+    async function toggleMark(value) {
+      const valueString = String(value);
+
+      const isMarked =
+        markedNumbers.has(valueString);
+
+      if (isMarked) {
+
+        markedNumbers.delete(valueString);
+
+        displayCard();
+
+        await fetch("/api/unmark", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            chatId: chatId,
+            userId: userId,
+            number: value
+          })
+        });
+
+      } else {
+
+        // Only allow marking called numbers.
+        if (
+          !calledNumbers.includes(Number(value))
+        ) {
+          document.getElementById("message").innerText =
+            "⚪ That number has not been called yet.";
+
+          setTimeout(() => {
+            document.getElementById("message").innerText =
+              "";
+          }, 1800);
 
           return;
         }
 
+        markedNumbers.add(valueString);
 
-        card =
-          data.card || [];
+        displayCard();
 
+        await fetch("/api/mark", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            chatId: chatId,
+            userId: userId,
+            number: value
+          })
+        });
+      }
+    }
 
-        const calledNumbers =
-          data.calledNumbers || [];
+    function displayCalledNumbers() {
+      const numbersElement =
+        document.getElementById("numbers");
 
+      numbersElement.innerHTML = "";
 
-        document.getElementById(
-          "playerName"
-        ).innerText =
-          "👤 " + data.name;
+      if (calledNumbers.length === 0) {
+        numbersElement.innerText = "No numbers called yet.";
+        return;
+      }
 
+      calledNumbers.forEach(number => {
 
-        document.getElementById(
-          "hostName"
-        ).innerText =
-          data.hostName || "Unknown";
+        const item =
+          document.createElement("div");
 
+        item.className = "number";
 
-        document.getElementById(
-          "playerCount"
-        ).innerText =
-          data.playerCount || 0;
+        item.innerText = number;
 
+        numbersElement.appendChild(item);
+      });
+    }
 
-        document.getElementById(
-          "calledCount"
-        ).innerText =
-          calledNumbers.length +
-          "/75";
+    async function claimBingo() {
+      const button =
+        document.getElementById("bingoButton");
 
+      button.disabled = true;
 
-        document.getElementById(
-          "status"
-        ).innerText =
-          data.winner
-            ? "🏆 Winner: " + data.winner
-            : "🟢 Game is running";
+      document.getElementById("message").innerText =
+        "🔎 Checking Bingo...";
 
+      try {
+        const response = await fetch(
+          `/api/bingo?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(userId)}`
+        );
 
-        document.getElementById(
-          "counter"
-        ).innerText =
-          calledNumbers.length +
-          "/75 numbers called";
+        const data = await response.json();
 
+        if (data.bingo) {
 
-        if (
-          calledNumbers.length > 0
-        ) {
+          document.getElementById("message").innerText =
+            "🏆 BINGO!";
 
-          const latest =
-            calledNumbers[
-              calledNumbers.length - 1
-            ];
+          const winnerBox =
+            document.getElementById("winner");
 
+          winnerBox.style.display = "block";
 
-          document.getElementById(
-            "latest"
-          ).innerText =
-            getLetter(latest) +
-            "-" +
-            latest;
+          winnerBox.innerText =
+            `🏆 Winner: ${data.winner}`;
 
         } else {
 
-          document.getElementById(
-            "latest"
-          ).innerText =
-            "--";
+          document.getElementById("message").innerText =
+            "❌ No Bingo yet.";
 
+          button.disabled = false;
         }
-
-
-        displayCalledNumbers(
-          calledNumbers
-        );
-
-
-        displayCard(
-          calledNumbers
-        );
-
 
       } catch (error) {
 
-        document.getElementById(
-          "status"
-        ).innerText =
-          "❌ Connection error.";
+        console.error(error);
 
+        document.getElementById("message").innerText =
+          "❌ Could not check Bingo.";
+
+        button.disabled = false;
       }
-
     }
 
-
-    function displayCard(
-      calledNumbers
-    ) {
-
-      for (
-        let row = 0;
-        row < 5;
-        row++
-      ) {
-
-        for (
-          let column = 0;
-          column < 5;
-          column++
-        ) {
-
-          const cell =
-            document.getElementById(
-              `cell-${row}-${column}`
-            );
-
-
-          const value =
-            card[row][column];
-
-
-          cell.innerText =
-            value;
-
-
-          cell.classList.remove(
-            "called",
-            "marked",
-            "free"
-          );
-
-
-          if (
-            value === "FREE"
-          ) {
-
-            cell.classList.add(
-              "free"
-            );
-
-          } else if (
-            markedNumbers.has(value)
-          ) {
-
-            cell.classList.add(
-              "marked"
-            );
-
-          } else if (
-            calledNumbers.includes(value)
-          ) {
-
-            cell.classList.add(
-              "called"
-            );
-
-          }
-
-
-          cell.onclick = () => {
-
-            if (
-              value === "FREE"
-            ) {
-              return;
-            }
-
-
-            if (
-              calledNumbers.includes(
-                value
-              )
-            ) {
-
-              if (
-                markedNumbers.has(value)
-              ) {
-
-                markedNumbers.delete(
-                  value
-                );
-
-              } else {
-
-                markedNumbers.add(
-                  value
-                );
-
-              }
-
-
-              displayCard(
-                calledNumbers
-              );
-
-            }
-
-          };
-
-        }
-
-      }
-
-    }
-
-
-    function displayCalledNumbers(
-      numbers
-    ) {
-
-      const container =
-        document.getElementById(
-          "calledNumbers"
-        );
-
-
-      container.innerHTML = "";
-
-
-      if (
-        numbers.length === 0
-      ) {
-
-        container.innerText =
-          "No numbers yet";
-
-        return;
-      }
-
-
-      numbers.forEach(
-        number => {
-
-          const span =
-            document.createElement(
-              "span"
-            );
-
-
-          span.className =
-            "number";
-
-
-          span.innerText =
-            getLetter(number) +
-            "-" +
-            number;
-
-
-          container.appendChild(
-            span
-          );
-
-        }
+    document
+      .getElementById("bingoButton")
+      .addEventListener(
+        "click",
+        claimBingo
       );
 
-    }
-
-
-    function getLetter(
-      number
-    ) {
-
-      if (
-        number <= 15
-      ) return "B";
-
-
-      if (
-        number <= 30
-      ) return "I";
-
-
-      if (
-        number <= 45
-      ) return "N";
-
-
-      if (
-        number <= 60
-      ) return "G";
-
-
-      return "O";
-
-    }
-
-
-    async function claimBingo() {
-
-      document.getElementById(
-        "message"
-      ).innerText =
-        "🔍 Checking Bingo...";
-
-
-      try {
-
-        const response =
-          await fetch(
-            `/api/bingo?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(userId)}`
-          );
-
-
-        const data =
-          await response.json();
-
-
-        if (
-          response.ok
-        ) {
-
-          document.getElementById(
-            "message"
-          ).innerText =
-            "🏆🎉 BINGO! You won!";
-
-
-          document.getElementById(
-            "status"
-          ).innerText =
-            "🏆 Winner: " +
-            data.winner;
-
-
-          return;
-        }
-
-
-        document.getElementById(
-          "message"
-        ).innerText =
-          "❌ " +
-          (
-            data.error ||
-            "Not Bingo yet!"
-          );
-
-
-      } catch (error) {
-
-        document.getElementById(
-          "message"
-        ).innerText =
-          "❌ Connection error.";
-
-      }
-
-    }
-
-
+    // Initial load
     loadCard();
 
-
+    // Keep game information updated.
     setInterval(
       loadCard,
       3000
     );
-
   </script>
 
 </body>
