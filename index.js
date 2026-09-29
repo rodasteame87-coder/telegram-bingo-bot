@@ -11,10 +11,12 @@ if (!BOT_TOKEN) {
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Store player cards
 const players = new Map();
 
-// Create a random Bingo card
+// Numbers called during the current game
+let calledNumbers = [];
+
+// Create a Bingo card
 function createBingoCard() {
   const ranges = [
     [1, 15],
@@ -42,13 +44,12 @@ function createBingoCard() {
     }
   }
 
-  // Free center
   card[2][2] = "FREE";
 
   return card;
 }
 
-// Format card for Telegram
+// Format Bingo card
 function formatCard(card) {
   let text = "🎟️ YOUR BINGO CARD\n\n";
 
@@ -57,9 +58,7 @@ function formatCard(card) {
 
   for (let row = 0; row < 5; row++) {
     for (let column = 0; column < 5; column++) {
-      const value = String(card[row][column]).padStart(4, " ");
-
-      text += value;
+      text += String(card[row][column]).padStart(5, " ");
     }
 
     text += "\n";
@@ -68,13 +67,27 @@ function formatCard(card) {
   return text;
 }
 
+// Get Bingo letter
+function getLetter(number) {
+  if (number <= 15) return "B";
+  if (number <= 30) return "I";
+  if (number <= 45) return "N";
+  if (number <= 60) return "G";
+  return "O";
+}
+
 bot.start((ctx) => {
   ctx.reply(
     "🎱 Welcome to Bingo Bot!\n\n" +
-    "Use /bingo to get your Bingo card."
+    "Commands:\n" +
+    "/bingo - Get a Bingo card\n" +
+    "/call - Call a number\n" +
+    "/numbers - Show called numbers\n" +
+    "/help - Show help"
   );
 });
 
+// Create a card
 bot.command("bingo", (ctx) => {
   const userId = ctx.from.id;
 
@@ -88,12 +101,50 @@ bot.command("bingo", (ctx) => {
   ctx.reply(formatCard(card));
 });
 
+// Call a random number
+bot.command("call", (ctx) => {
+  if (calledNumbers.length >= 75) {
+    return ctx.reply("🎱 All 75 numbers have been called!");
+  }
+
+  let number;
+
+  do {
+    number = Math.floor(Math.random() * 75) + 1;
+  } while (calledNumbers.includes(number));
+
+  calledNumbers.push(number);
+
+  const letter = getLetter(number);
+
+  ctx.reply(
+    `🎱 NUMBER CALLED!\n\n` +
+    `🔔 ${letter}-${number}\n\n` +
+    `Numbers called: ${calledNumbers.length}/75`
+  );
+});
+
+// Show called numbers
+bot.command("numbers", (ctx) => {
+  if (calledNumbers.length === 0) {
+    return ctx.reply("📋 No numbers have been called yet.");
+  }
+
+  const sorted = [...calledNumbers].sort((a, b) => a - b);
+
+  ctx.reply(
+    `📋 CALLED NUMBERS\n\n` +
+    `${sorted.join(", ")}\n\n` +
+    `Total: ${calledNumbers.length}/75`
+  );
+});
+
 bot.command("help", (ctx) => {
   ctx.reply(
     "📋 Commands:\n\n" +
-    "/start - Start the bot\n" +
     "/bingo - Get a Bingo card\n" +
-    "/help - Show help"
+    "/call - Call a number\n" +
+    "/numbers - Show called numbers"
   );
 });
 
