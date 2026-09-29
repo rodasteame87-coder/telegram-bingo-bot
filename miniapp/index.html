@@ -1,678 +1,560 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">  <title>Bingo</title>  <script src="https://telegram.org/js/telegram-web-app.js"></script>  <style>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Telegram Bingo</title>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
     * {
       box-sizing: border-box;
     }
 
     body {
       margin: 0;
-      padding: 15px;
-      background: #111827;
-      color: white;
+      padding: 20px;
+      background: #f2f4f7;
       font-family: Arial, sans-serif;
-      text-align: center;
+      color: #111827;
     }
 
-    h1 {
-      margin: 5px 0 15px;
-    }
-
-    .info {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: 15px;
-    }
-
-    .infoBox {
-      background: #1f2937;
-      border-radius: 12px;
-      padding: 10px 5px;
-      font-size: 13px;
-    }
-
-    .infoValue {
-      display: block;
-      margin-top: 5px;
-      font-size: 15px;
-      font-weight: bold;
-    }
-
-    .lastCalled {
-      background: #1f2937;
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 15px;
-    }
-
-    .lastNumber {
-      font-size: 28px;
-      font-weight: bold;
-      margin-top: 5px;
-    }
-
-    .board {
-      max-width: 420px;
+    .container {
+      max-width: 520px;
       margin: 0 auto;
     }
 
-    .letters {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 5px;
-      margin-bottom: 5px;
+    h1 {
+      text-align: center;
+      margin: 0 0 10px;
     }
 
-    .letter {
-      font-size: 20px;
+    .info {
+      background: white;
+      border-radius: 14px;
+      padding: 15px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .info div {
+      margin: 5px 0;
+    }
+
+    .error {
+      background: #fee2e2;
+      color: #991b1b;
+      border-radius: 12px;
+      padding: 15px;
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 30px;
+      font-size: 18px;
+    }
+
+    .last {
+      text-align: center;
+      font-size: 18px;
       font-weight: bold;
-      padding: 8px;
+      margin: 12px 0;
     }
 
-    .card {
+    .board {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 5px;
+      gap: 6px;
+      background: #111827;
+      padding: 6px;
+      border-radius: 14px;
     }
 
     .cell {
       aspect-ratio: 1;
+      border-radius: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 10px;
-      background: #374151;
-      border: 2px solid #4b5563;
-      font-size: 19px;
+      font-size: clamp(16px, 5vw, 25px);
       font-weight: bold;
+      background: white;
+      color: #111827;
       cursor: pointer;
       user-select: none;
     }
 
-    .cell.called {
-      background: white;
-      color: #222;
-      border: 2px solid #35c759;
-    }
-
-    .cell.marked {
-      background: #35c759;
+    .header {
+      background: #374151;
       color: white;
-      border: 2px solid #35c759;
-    }
-
-    .cell.free {
-      background: #ffcc00;
-      color: #111;
-      border: 2px solid #ffcc00;
       cursor: default;
     }
 
-    .calledNumbers {
-      margin-top: 20px;
-      background: #1f2937;
-      border-radius: 12px;
-      padding: 12px;
-      text-align: left;
+    .called {
+      border: 4px solid #16a34a;
     }
 
-    .numbers {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 10px;
+    .marked {
+      background: #16a34a;
+      color: white;
     }
 
-    .number {
-      background: #374151;
-      border-radius: 8px;
-      padding: 7px 9px;
-      font-size: 13px;
+    .free {
+      background: #facc15;
+      color: #111827;
+      cursor: default;
     }
 
-    .bingoButton {
+    button {
       width: 100%;
-      max-width: 420px;
-      margin-top: 18px;
-      padding: 15px;
+      margin-top: 15px;
+      padding: 16px;
       border: none;
       border-radius: 12px;
-      background: #35c759;
+      background: #16a34a;
       color: white;
       font-size: 20px;
       font-weight: bold;
       cursor: pointer;
     }
 
-    .bingoButton:disabled {
-      opacity: 0.5;
+    button:active {
+      transform: scale(0.98);
     }
 
-    .winner {
-      background: #ffcc00;
-      color: #111;
-      padding: 15px;
-      border-radius: 12px;
-      margin-top: 15px;
+    .status {
+      text-align: center;
+      margin-top: 12px;
       font-weight: bold;
     }
 
-    .message {
-      margin-top: 10px;
-      min-height: 22px;
-      font-size: 14px;
+    .winner {
+      background: #fef3c7;
+      color: #92400e;
+      padding: 15px;
+      border-radius: 12px;
+      text-align: center;
+      margin-bottom: 15px;
+      font-weight: bold;
     }
-  </style></head><body>  <h1>🎱 BINGO</h1>  <div class="info"><div class="infoBox">
-  👑 Host
-  <span id="hostName" class="infoValue">
-    Loading...
-  </span>
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>🎱 Bingo</h1>
+
+  <div id="loading" class="loading">
+    Loading your card...
+  </div>
+
+  <div id="error" class="error" style="display:none;"></div>
+
+  <div id="game" style="display:none;">
+
+    <div class="info">
+      <div>
+        👤 Player:
+        <strong id="playerName">-</strong>
+      </div>
+
+      <div>
+        👑 Host:
+        <strong id="hostName">-</strong>
+      </div>
+
+      <div>
+        👥 Players:
+        <strong id="playerCount">-</strong>
+      </div>
+
+      <div>
+        🎱 Called:
+        <strong id="calledCount">0</strong>/75
+      </div>
+    </div>
+
+    <div
+      id="winner"
+      class="winner"
+      style="display:none;"
+    ></div>
+
+    <div id="lastCalled" class="last">
+      Waiting for numbers...
+    </div>
+
+    <div class="board" id="board">
+
+      <div class="cell header">B</div>
+      <div class="cell header">I</div>
+      <div class="cell header">N</div>
+      <div class="cell header">G</div>
+      <div class="cell header">O</div>
+
+    </div>
+
+    <button id="bingoButton">
+      🎉 BINGO!
+    </button>
+
+    <div
+      id="status"
+      class="status"
+    ></div>
+
+  </div>
+
 </div>
 
-<div class="infoBox">
-  👥 Players
-  <span id="playerCount" class="infoValue">
-    0
-  </span>
-</div>
+<script>
+  const tg = window.Telegram.WebApp;
 
-<div class="infoBox">
-  🎱 Called
-  <span id="calledCount" class="infoValue">
-    0/75
-  </span>
-</div>
+  tg.ready();
+  tg.expand();
 
-  </div>  <div class="infoBox" style="margin-bottom:15px;">
-    👤 You
-    <span id="playerName" class="infoValue">
-      Loading...
-    </span>
-  </div>  <div class="lastCalled">
-    Last called number<div id="lastCalled" class="lastNumber">
-  —
-</div>
+  const API = window.location.origin;
 
-  </div>  <div class="board"><div class="letters">
-  <div class="letter">B</div>
-  <div class="letter">I</div>
-  <div class="letter">N</div>
-  <div class="letter">G</div>
-  <div class="letter">O</div>
-</div>
+  let chatId = null;
+  let userId = null;
+  let currentData = null;
 
-<div id="card" class="card"></div>
+  function showError(message) {
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("game").style.display = "none";
 
-  </div>  <div class="calledNumbers"><strong>🎱 Called Numbers</strong>
+    const error = document.getElementById("error");
 
-<div id="numbers" class="numbers">
-  —
-</div>
+    error.textContent = message;
+    error.style.display = "block";
+  }
 
-  </div><button
-id="bingoButton"
-class="bingoButton"
-
-«»
-
-🏆 BINGO!
-
-  </button>  <div
-    id="winner"
-    class="winner"
-    style="display:none;"
-  ></div>  <div id="message" class="message"></div>  <script>
-    const tg = window.Telegram.WebApp;
-
-    tg.ready();
-    tg.expand();
-
-    const userId =
+  function getIds() {
+    userId =
       tg.initDataUnsafe &&
       tg.initDataUnsafe.user
         ? tg.initDataUnsafe.user.id
         : null;
 
     /*
-      Telegram can expose startapp in different places.
-      Try all available locations.
+      Telegram Main Mini App direct links put the
+      /play chat ID into start_param.
     */
-
-    let chatId = "";
 
     if (
       tg.initDataUnsafe &&
       tg.initDataUnsafe.start_param
     ) {
+      chatId = tg.initDataUnsafe.start_param;
+    }
+
+    /*
+      Additional fallback in case Telegram exposes
+      the value in the page URL.
+    */
+
+    if (!chatId) {
+      const params =
+        new URLSearchParams(window.location.search);
+
       chatId =
-        tg.initDataUnsafe.start_param;
+        params.get("startapp") ||
+        params.get("start_param") ||
+        params.get("chatId");
     }
 
-    if (
-      !chatId &&
-      tg.initDataUnsafe &&
-      tg.initDataUnsafe.query_id
-    ) {
-      // Keep current value if Telegram already supplied it.
+    if (chatId) {
+      chatId = String(chatId);
     }
 
-    // Also read the browser URL.
+    if (userId) {
+      userId = String(userId);
+    }
+  }
+
+  async function loadCard() {
     try {
-      const currentUrl =
-        new URL(window.location.href);
-
-      const urlStartApp =
-        currentUrl.searchParams.get("startapp");
-
-      const urlStartParam =
-        currentUrl.searchParams.get("start_param");
-
-      if (urlStartApp) {
-        chatId = urlStartApp;
-      }
-
-      if (!chatId && urlStartParam) {
-        chatId = urlStartParam;
-      }
-    } catch (error) {
-      console.log("URL read error:", error);
-    }
-
-    let card = [];
-    let calledNumbers = [];
-    let markedNumbers = new Set();
-
-    async function loadCard() {
-
-      if (!userId) {
-        document.getElementById("message").innerText =
-          "❌ Telegram user could not be identified.";
-        return;
-      }
+      getIds();
 
       if (!chatId) {
-        document.getElementById("message").innerText =
-          "❌ Game could not be identified. Please open the game using /play.";
-        return;
+        return showError(
+          "Could not identify the Bingo game. Please open the Mini App using /play from your Bingo group."
+        );
       }
 
-      try {
-
-        const response = await fetch(
-          `/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(userId)}`
+      if (!userId) {
+        return showError(
+          "Could not identify your Telegram account. Please open this inside Telegram."
         );
+      }
 
-        const data = await response.json();
+      const response = await fetch(
+        `${API}/api/card?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(userId)}`
+      );
 
-        if (!response.ok) {
-          document.getElementById("message").innerText =
-            "❌ " + (
-              data.error ||
-              "Could not load Bingo card."
-            );
+      const data = await response.json();
 
-          return;
-        }
+      if (!response.ok) {
+        return showError(
+          data.error || "Could not load your Bingo card."
+        );
+      }
 
-        card =
-          data.card || [];
+      currentData = data;
 
-        calledNumbers =
-          data.calledNumbers || [];
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("error").style.display = "none";
+      document.getElementById("game").style.display = "block";
 
-        markedNumbers =
-          new Set(
-            (data.markedNumbers || [])
-              .map(String)
-          );
+      document.getElementById("playerName").textContent =
+        data.name;
 
-        document.getElementById(
-          "playerName"
-        ).innerText =
-          "👤 " + data.name;
+      document.getElementById("hostName").textContent =
+        data.hostName;
 
-        document.getElementById(
-          "hostName"
-        ).innerText =
-          data.hostName || "Unknown";
+      document.getElementById("playerCount").textContent =
+        data.playerCount;
 
-        document.getElementById(
-          "playerCount"
-        ).innerText =
-          data.playerCount || 0;
+      const calledNumbers =
+        data.calledNumbers || [];
 
-        document.getElementById(
-          "calledCount"
-        ).innerText =
-          calledNumbers.length + "/75";
+      document.getElementById("calledCount").textContent =
+        calledNumbers.length;
 
-        if (calledNumbers.length > 0) {
+      if (calledNumbers.length > 0) {
+        document.getElementById("lastCalled").textContent =
+          `🎱 Last called: ${calledNumbers[calledNumbers.length - 1]}`;
+      } else {
+        document.getElementById("lastCalled").textContent =
+          "Waiting for numbers...";
+      }
 
-          const last =
-            calledNumbers[
-              calledNumbers.length - 1
-            ];
+      if (data.winner) {
+        const winnerBox =
+          document.getElementById("winner");
 
-          document.getElementById(
-            "lastCalled"
-          ).innerText = last;
+        winnerBox.textContent =
+          `🏆 ${data.winner} won this game!`;
 
+        winnerBox.style.display = "block";
+      }
+
+      renderBoard(data);
+
+    } catch (error) {
+      console.error(error);
+
+      showError(
+        "Could not connect to the Bingo server."
+      );
+    }
+  }
+
+  function renderBoard(data) {
+    const board =
+      document.getElementById("board");
+
+    board.innerHTML = "";
+
+    const headers = ["B", "I", "N", "G", "O"];
+
+    headers.forEach(letter => {
+      const cell =
+        document.createElement("div");
+
+      cell.className =
+        "cell header";
+
+      cell.textContent = letter;
+
+      board.appendChild(cell);
+    });
+
+    const calledNumbers =
+      data.calledNumbers || [];
+
+    const markedNumbers =
+      data.markedNumbers || [];
+
+    data.card.forEach(row => {
+      row.forEach(value => {
+
+        const cell =
+          document.createElement("div");
+
+        cell.className = "cell";
+
+        cell.textContent = value;
+
+        if (value === "FREE") {
+          cell.classList.add("free");
         } else {
 
-          document.getElementById(
-            "lastCalled"
-          ).innerText = "—";
-        }
+          const number =
+            Number(value);
 
-        displayCard();
-        displayCalledNumbers();
-
-        if (data.winner) {
-
-          const winnerBox =
-            document.getElementById("winner");
-
-          winnerBox.style.display =
-            "block";
-
-          winnerBox.innerText =
-            `🏆 Winner: ${data.winner}`;
-
-          document.getElementById(
-            "bingoButton"
-          ).disabled = true;
-        }
-
-      } catch (error) {
-
-        console.error(error);
-
-        document.getElementById(
-          "message"
-        ).innerText =
-          "❌ Connection error.";
-      }
-    }
-
-    function displayCard() {
-
-      const cardElement =
-        document.getElementById("card");
-
-      cardElement.innerHTML = "";
-
-      if (!card || card.length !== 5) {
-        return;
-      }
-
-      for (let row = 0; row < 5; row++) {
-
-        for (let col = 0; col < 5; col++) {
-
-          const value =
-            card[row][col];
-
-          const cell =
-            document.createElement("div");
-
-          cell.className = "cell";
-
-          cell.innerText =
-            value;
-
-          if (value === "FREE") {
-
-            cell.classList.add("free");
-
-          } else if (
-            markedNumbers.has(
-              String(value)
-            )
-          ) {
-
-            cell.classList.add("marked");
-
-          } else if (
-            calledNumbers.includes(
-              Number(value)
-            )
-          ) {
-
+          if (calledNumbers.includes(number)) {
             cell.classList.add("called");
           }
 
-          if (value !== "FREE") {
-
-            cell.addEventListener(
-              "click",
-              () => toggleMark(value)
-            );
+          if (markedNumbers.includes(number)) {
+            cell.classList.add("marked");
           }
 
-          cardElement.appendChild(cell);
+          cell.addEventListener(
+            "click",
+            () => toggleNumber(
+              number,
+              cell
+            )
+          );
         }
-      }
+
+        board.appendChild(cell);
+      });
+    });
+  }
+
+  async function toggleNumber(number, cell) {
+    if (!currentData) return;
+
+    const calledNumbers =
+      currentData.calledNumbers || [];
+
+    if (!calledNumbers.includes(number)) {
+      document.getElementById("status").textContent =
+        "⚠️ That number has not been called yet.";
+
+      return;
     }
 
-    async function toggleMark(value) {
+    const markedNumbers =
+      currentData.markedNumbers || [];
 
-      const valueString =
-        String(value);
+    const isMarked =
+      markedNumbers.includes(number);
 
-      const isMarked =
-        markedNumbers.has(
-          valueString
-        );
+    try {
+      const response = await fetch(
+        `${API}/${isMarked ? "api/unmark" : "api/mark"}`,
+        {
+          method: "POST",
 
-      if (isMarked) {
+          headers: {
+            "Content-Type": "application/json"
+          },
 
-        markedNumbers.delete(
-          valueString
-        );
+          body: JSON.stringify({
+            chatId,
+            userId,
+            number
+          })
+        }
+      );
 
-        displayCard();
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        document.getElementById("status").textContent =
+          data.error || "Could not update number.";
+
+        return;
+      }
+
+      currentData.markedNumbers =
+        data.markedNumbers || [];
+
+      renderBoard(currentData);
+
+      document.getElementById("status").textContent =
+        isMarked
+          ? `Number ${number} unmarked.`
+          : `Number ${number} marked.`;
+
+    } catch (error) {
+      console.error(error);
+
+      document.getElementById("status").textContent =
+        "Could not save your mark.";
+    }
+  }
+
+  document
+    .getElementById("bingoButton")
+    .addEventListener(
+      "click",
+      async () => {
 
         try {
 
-          await fetch(
-            "/api/unmark",
+          const response = await fetch(
+            `${API}/api/bingo`,
             {
               method: "POST",
+
               headers: {
-                "Content-Type":
-                  "application/json"
+                "Content-Type": "application/json"
               },
+
               body: JSON.stringify({
-                chatId: chatId,
-                userId: userId,
-                number: value
+                chatId,
+                userId
               })
             }
           );
 
+          const data =
+            await response.json();
+
+          if (!response.ok) {
+            document.getElementById("status").textContent =
+              data.error || "Could not check Bingo.";
+
+            return;
+          }
+
+          if (data.bingo) {
+
+            document.getElementById("status").textContent =
+              `🎉 BINGO! ${data.winner} wins!`;
+
+            await loadCard();
+
+          } else {
+
+            document.getElementById("status").textContent =
+              "❌ No Bingo yet. Complete a row, column, or diagonal.";
+
+          }
+
         } catch (error) {
 
           console.error(error);
+
+          document.getElementById("status").textContent =
+            "Could not check Bingo.";
+
         }
-
-        return;
       }
-
-      if (
-        !calledNumbers.includes(
-          Number(value)
-        )
-      ) {
-
-        document.getElementById(
-          "message"
-        ).innerText =
-          "⚪ That number has not been called yet.";
-
-        setTimeout(() => {
-
-          document.getElementById(
-            "message"
-          ).innerText = "";
-
-        }, 1800);
-
-        return;
-      }
-
-      markedNumbers.add(
-        valueString
-      );
-
-      displayCard();
-
-      try {
-
-        await fetch(
-          "/api/mark",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-            body: JSON.stringify({
-              chatId: chatId,
-              userId: userId,
-              number: value
-            })
-          }
-        );
-
-      } catch (error) {
-
-        console.error(error);
-      }
-    }
-
-    function displayCalledNumbers() {
-
-      const numbersElement =
-        document.getElementById(
-          "numbers"
-        );
-
-      numbersElement.innerHTML = "";
-
-      if (
-        calledNumbers.length === 0
-      ) {
-
-        numbersElement.innerText =
-          "No numbers called yet.";
-
-        return;
-      }
-
-      calledNumbers.forEach(
-        number => {
-
-          const item =
-            document.createElement(
-              "div"
-            );
-
-          item.className =
-            "number";
-
-          item.innerText =
-            number;
-
-          numbersElement.appendChild(
-            item
-          );
-        }
-      );
-    }
-
-    async function claimBingo() {
-
-      const button =
-        document.getElementById(
-          "bingoButton"
-        );
-
-      button.disabled = true;
-
-      document.getElementById(
-        "message"
-      ).innerText =
-        "🔎 Checking Bingo...";
-
-      try {
-
-        const response =
-          await fetch(
-            `/api/bingo?chatId=${encodeURIComponent(chatId)}&userId=${encodeURIComponent(userId)}`
-          );
-
-        const data =
-          await response.json();
-
-        if (data.bingo) {
-
-          document.getElementById(
-            "message"
-          ).innerText =
-            "🏆 BINGO!";
-
-          const winnerBox =
-            document.getElementById(
-              "winner"
-            );
-
-          winnerBox.style.display =
-            "block";
-
-          winnerBox.innerText =
-            `🏆 Winner: ${data.winner}`;
-
-        } else {
-
-          document.getElementById(
-            "message"
-          ).innerText =
-            "❌ No Bingo yet.";
-
-          button.disabled =
-            false;
-        }
-
-      } catch (error) {
-
-        console.error(error);
-
-        document.getElementById(
-          "message"
-        ).innerText =
-          "❌ Could not check Bingo.";
-
-        button.disabled =
-          false;
-      }
-    }
-
-    document
-      .getElementById(
-        "bingoButton"
-      )
-      .addEventListener(
-        "click",
-        claimBingo
-      );
-
-    loadCard();
-
-    setInterval(
-      loadCard,
-      3000
     );
-  </script></body>
+
+  loadCard();
+
+  setInterval(
+    loadCard,
+    3000
+  );
+</script>
+
+</body>
 </html>
