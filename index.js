@@ -13,6 +13,7 @@ if (!BOT_TOKEN) {
 }
 
 const bot = new Telegraf(BOT_TOKEN);
+console.log("✅ Bot token loaded and Telegraf created");
 const games = new Map();
 
 function createBingoCard() {
