@@ -1,0 +1,12 @@
+{
+  "name": "telegram-bingo-bot",
+  "version": "1.0.0",
+  "description": "Telegram Bingo Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3"
+  }
+}
