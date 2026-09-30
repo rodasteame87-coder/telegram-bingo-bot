@@ -15,8 +15,8 @@ const RENDER_URL =
 const MINIAPP_URL = `${RENDER_URL}/miniapp`;
 const MINIAPP_FILE = path.join(__dirname, "miniapp", "index.html");
 
-// Automatic caller: 5 seconds
-const CALL_INTERVAL = 5000;
+// Automatic Bingo caller: 2.5 seconds
+const CALL_INTERVAL = 2500;
 
 if (!BOT_TOKEN) {
   throw new Error("BOT_TOKEN is missing");
@@ -103,7 +103,7 @@ async function initDatabase() {
   );
 
   // Permanent Bingo cards.
-  // Do NOT drop this table.
+  // This table is NEVER deleted.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS bingo_cards (
       card_number INTEGER PRIMARY KEY,
@@ -227,9 +227,7 @@ async function generatePermanentCards() {
     );
 
     existingBoards.add(
-      JSON.stringify(
-        row.board
-      )
+      JSON.stringify(row.board)
     );
   }
 
@@ -423,7 +421,8 @@ async function getGameState() {
     `);
 
   if (
-    result.rows.length === 0
+    result.rows.length ===
+    0
   ) {
     return null;
   }
@@ -663,6 +662,51 @@ async function callNextNumber() {
       `GAME #${row.game_id}: CALLED ${number}`
     );
 
+    if (
+      calledNumbers.length >=
+      75
+    ) {
+      setTimeout(
+        async () => {
+          try {
+            await pool.query(`
+              UPDATE game_state
+              SET
+                status = 'finished',
+                current_number = NULL,
+                updated_at = NOW()
+              WHERE id = 1
+            `);
+
+            console.log(
+              `BINGO GAME #${row.game_id} FINISHED`
+            );
+
+            setTimeout(
+              async () => {
+                try {
+                  await startNewGame();
+                } catch (error) {
+                  console.error(
+                    "NEW GAME ERROR:",
+                    error
+                  );
+                }
+              },
+              5000
+            );
+
+          } catch (error) {
+            console.error(
+              "FINISH GAME ERROR:",
+              error
+            );
+          }
+        },
+        1000
+      );
+    }
+
   } catch (error) {
 
     try {
@@ -687,12 +731,13 @@ function startAutomaticCaller() {
   );
 
   console.log(
-    "Numbers will be called every 5 seconds."
+    "Numbers will be called every 2.5 seconds."
   );
 
   setInterval(
     async () => {
       try {
+
         const game =
           await getGameState();
 
@@ -704,6 +749,7 @@ function startAutomaticCaller() {
           game.status ===
           "waiting"
         ) {
+
           await startNewGame();
 
           return;
@@ -713,6 +759,7 @@ function startAutomaticCaller() {
           game.status ===
           "playing"
         ) {
+
           await callNextNumber();
 
           return;
@@ -784,6 +831,7 @@ const mainKeyboard = {
 bot.start(
   async (ctx) => {
     try {
+
       await registerPlayer(
         ctx.from
       );
@@ -815,7 +863,9 @@ Choose an option below:`,
 bot.hears(
   "▶️ Start",
   async (ctx) => {
+
     try {
+
       await registerPlayer(
         ctx.from
       );
@@ -841,7 +891,9 @@ bot.hears(
 bot.hears(
   "🎮 Play",
   async (ctx) => {
+
     try {
+
       await registerPlayer(
         ctx.from
       );
@@ -880,6 +932,7 @@ bot.hears(
 bot.hears(
   "💰 Deposit",
   async (ctx) => {
+
     await ctx.reply(
       `💰 Deposit
 
@@ -893,7 +946,9 @@ Your balance will appear here when the payment system is added.`
 bot.hears(
   "💵 Balance",
   async (ctx) => {
+
     try {
+
       const result =
         await pool.query(
           `
@@ -911,6 +966,7 @@ bot.hears(
         result.rows.length ===
         0
       ) {
+
         await registerPlayer(
           ctx.from
         );
@@ -952,6 +1008,7 @@ bot.hears(
 bot.hears(
   "🏧 Withdraw",
   async (ctx) => {
+
     await ctx.reply(
       `🏧 Withdraw
 
@@ -963,6 +1020,7 @@ Withdrawal functionality is currently under development.`
 bot.hears(
   "❓ HIW / How to Play",
   async (ctx) => {
+
     await ctx.reply(
       `❓ HOW TO PLAY
 
@@ -972,7 +1030,7 @@ bot.hears(
 4️⃣ Preview your card.
 5️⃣ Press OK to confirm.
 6️⃣ The game automatically calls numbers from 1–75.
-7️⃣ A new number appears every 5 seconds.
+7️⃣ A new number appears every 2.5 seconds.
 8️⃣ Mark numbers on your card when they are called.
 9️⃣ Press BINGO when you have a winning line.
 
@@ -987,6 +1045,7 @@ Good luck! 🍀`
 bot.hears(
   "📨 Invite",
   async (ctx) => {
+
     const username =
       ctx.botInfo?.username;
 
@@ -1012,6 +1071,7 @@ ${inviteLink}`
 bot.hears(
   "🆘 Support",
   async (ctx) => {
+
     await ctx.reply(
       `🆘 Support
 
@@ -1036,6 +1096,7 @@ const server =
           req.url ===
             "/health"
         ) {
+
           res.writeHead(
             200,
             {
@@ -1066,6 +1127,7 @@ const server =
               MINIAPP_FILE
             )
           ) {
+
             res.writeHead(
               404,
               {
@@ -1685,6 +1747,7 @@ const server =
                       number
                     )
                   ) {
+
                     marked.push(
                       number
                     );
@@ -1961,9 +2024,6 @@ const server =
                       .rows[0]
                       .board;
 
-                  const winningLines =
-                    [];
-
                   const columns = [
                     board.B,
                     board.I,
@@ -1971,6 +2031,9 @@ const server =
                     board.G,
                     board.O
                   ];
+
+                  const winningLines =
+                    [];
 
                   // Rows
                   for (
@@ -2024,7 +2087,7 @@ const server =
                     );
                   }
 
-                  // Diagonal
+                  // Diagonal 1
                   winningLines.push([
                     board.B[0],
                     board.I[1],
@@ -2033,6 +2096,7 @@ const server =
                     board.O[4]
                   ]);
 
+                  // Diagonal 2
                   winningLines.push([
                     board.B[4],
                     board.I[3],
@@ -2079,6 +2143,7 @@ const server =
                     if (
                       complete
                     ) {
+
                       valid =
                         true;
 
@@ -2264,7 +2329,7 @@ async function start() {
         );
 
         console.log(
-          "Automatic Bingo caller: EVERY 5 SECONDS"
+          "Automatic Bingo caller: EVERY 2.5 SECONDS"
         );
       }
     );
