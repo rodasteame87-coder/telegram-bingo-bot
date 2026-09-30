@@ -14,115 +14,155 @@
   <style>
     * {
       box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
     }
 
     body {
       margin: 0;
-      padding: 15px;
+      padding: 0;
       font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      color: #222;
+      background: #f2f4f7;
+      color: #111;
+    }
+
+    .app {
+      max-width: 600px;
+      margin: auto;
+      padding: 16px;
     }
 
     h1 {
       text-align: center;
-      margin: 5px 0 5px;
+      margin: 5px 0 8px;
+      font-size: 28px;
     }
 
     .subtitle {
       text-align: center;
-      color: #666;
-      margin-bottom: 15px;
+      margin-bottom: 18px;
+      color: #555;
+      font-size: 15px;
     }
 
-    #cards {
+    .loading {
+      text-align: center;
+      padding: 30px 10px;
+      font-size: 18px;
+    }
+
+    .error {
+      background: #ffe5e5;
+      color: #b00020;
+      padding: 14px;
+      border-radius: 10px;
+      text-align: center;
+      margin-bottom: 15px;
+      display: none;
+    }
+
+    .cards-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .card-list {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       gap: 8px;
-      max-width: 500px;
-      margin: auto;
     }
 
-    .card-number {
+    .card-button {
       border: none;
       border-radius: 10px;
-      padding: 14px 5px;
-      font-size: 16px;
-      font-weight: bold;
       background: white;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.12);
+      min-height: 52px;
+      font-size: 17px;
+      font-weight: bold;
+      box-shadow: 0 2px 7px rgba(0,0,0,0.10);
       cursor: pointer;
     }
 
-    .card-number.selected {
+    .card-button:active {
+      transform: scale(0.96);
+    }
+
+    .card-button.selected {
       background: #2196f3;
       color: white;
     }
 
-    #preview {
+    .preview-section {
       display: none;
-      max-width: 500px;
-      margin: 20px auto;
+      margin-top: 22px;
       background: white;
-      padding: 12px;
-      border-radius: 15px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.10);
     }
 
-    #preview h2 {
+    .preview-title {
       text-align: center;
-      margin: 5px 0 12px;
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 12px;
     }
 
     .bingo-board {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 4px;
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 4px;
+      table-layout: fixed;
     }
 
-    .cell {
-      aspect-ratio: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #eeeeee;
-      border-radius: 6px;
-      font-size: 15px;
-      font-weight: bold;
-    }
-
-    .header {
-      background: #333;
+    .bingo-board th {
+      height: 38px;
+      font-size: 20px;
+      background: #2196f3;
       color: white;
+      border-radius: 6px;
+    }
+
+    .bingo-board td {
+      height: 58px;
+      text-align: center;
+      font-size: 17px;
+      font-weight: bold;
+      background: #f1f3f5;
+      border-radius: 7px;
+      border: 1px solid #ddd;
     }
 
     .free {
-      background: #4caf50;
-      color: white;
-      font-size: 11px;
+      background: #ffd54f !important;
+      color: #111;
+      font-size: 13px !important;
     }
 
-    #okButton {
-      display: block;
+    .ok-button {
       width: 100%;
       margin-top: 15px;
-      padding: 14px;
+      padding: 15px;
       border: none;
       border-radius: 10px;
-      background: #2196f3;
+      background: #22a447;
       color: white;
-      font-size: 18px;
+      font-size: 19px;
       font-weight: bold;
-      cursor: pointer;
     }
 
-    #okButton:disabled {
+    .ok-button:disabled {
       background: #aaa;
     }
 
-    #message {
+    .selected-message {
+      display: none;
+      margin-top: 15px;
+      padding: 14px;
+      background: #e1f5e8;
+      color: #176b35;
+      border-radius: 10px;
       text-align: center;
-      margin: 15px 0;
       font-weight: bold;
     }
   </style>
@@ -130,22 +170,69 @@
 
 <body>
 
-  <h1>🎱 Bingo</h1>
-  <div class="subtitle">Choose your card</div>
+<div class="app">
 
-  <div id="message">Loading cards...</div>
+  <h1>🎯 BINGO</h1>
 
-  <div id="cards"></div>
-
-  <div id="preview">
-    <h2 id="previewTitle">Card</h2>
-
-    <div id="board" class="bingo-board"></div>
-
-    <button id="okButton" disabled>
-      OK
-    </button>
+  <div class="subtitle">
+    Choose your Bingo card
   </div>
+
+  <div id="error" class="error"></div>
+
+  <div id="loading" class="loading">
+    Loading cards...
+  </div>
+
+  <div id="game" style="display:none;">
+
+    <div class="cards-title">
+      Choose 1 card from 1–100
+    </div>
+
+    <div id="cardList" class="card-list"></div>
+
+    <div id="previewSection" class="preview-section">
+
+      <div id="previewTitle" class="preview-title">
+        Card #1
+      </div>
+
+      <table class="bingo-board">
+
+        <thead>
+          <tr>
+            <th>B</th>
+            <th>I</th>
+            <th>N</th>
+            <th>G</th>
+            <th>O</th>
+          </tr>
+        </thead>
+
+        <tbody id="boardBody"></tbody>
+
+      </table>
+
+      <button
+        id="okButton"
+        class="ok-button"
+      >
+        ✅ OK — Select This Card
+      </button>
+
+      <div
+        id="selectedMessage"
+        class="selected-message"
+      >
+        ✅ Card selected successfully!
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
 
 <script>
   const tg = window.Telegram.WebApp;
@@ -153,224 +240,387 @@
   tg.ready();
   tg.expand();
 
-  const cardsContainer = document.getElementById("cards");
-  const preview = document.getElementById("preview");
-  const previewTitle = document.getElementById("previewTitle");
-  const board = document.getElementById("board");
-  const okButton = document.getElementById("okButton");
-  const message = document.getElementById("message");
-
-  let cards = [];
-  let selectedCard = null;
-
-  /*
-   * Telegram Mini App authentication data.
-   */
   const initData = tg.initData;
 
-  async function api(url, options = {}) {
-    const headers = {
-      "Content-Type": "application/json",
-      "Authorization": `tma ${initData}`,
-      ...(options.headers || {})
-    };
+  const loading = document.getElementById("loading");
+  const game = document.getElementById("game");
+  const errorBox = document.getElementById("error");
+  const cardList = document.getElementById("cardList");
+  const previewSection =
+    document.getElementById("previewSection");
+  const previewTitle =
+    document.getElementById("previewTitle");
+  const boardBody =
+    document.getElementById("boardBody");
+  const okButton =
+    document.getElementById("okButton");
+  const selectedMessage =
+    document.getElementById("selectedMessage");
 
+  let cards = [];
+  let selectedCardNumber = null;
+
+  function showError(message) {
+    errorBox.textContent = message;
+    errorBox.style.display = "block";
+    loading.style.display = "none";
+  }
+
+  function hideError() {
+    errorBox.style.display = "none";
+  }
+
+  async function getJSON(url, options = {}) {
     const response = await fetch(url, {
       ...options,
-      headers
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
     });
 
-    const data = await response.json();
+    const text = await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(
+        "Server returned an invalid response."
+      );
+    }
 
     if (!response.ok) {
-      throw new Error(data.error || "Request failed");
+      throw new Error(
+        data.error || "Request failed."
+      );
     }
 
     return data;
   }
 
-  /*
-   * Load all 100 permanent cards.
-   */
-  async function loadCards() {
-    try {
-      message.textContent = "Loading cards...";
+  function normalizeBoard(board) {
+    /*
+      Expected database format:
 
-      const data = await api("/api/cards");
+      {
+        B: [1,2,3,4,5],
+        I: [16,17,18,19,20],
+        N: [31,32,"FREE",34,35],
+        G: [46,47,48,49,50],
+        O: [61,62,63,64,65]
+      }
+    */
 
-      cards = data.cards || [];
+    if (!board) {
+      return null;
+    }
 
-      cardsContainer.innerHTML = "";
+    if (
+      board.B &&
+      board.I &&
+      board.N &&
+      board.G &&
+      board.O
+    ) {
+      return [
+        board.B,
+        board.I,
+        board.N,
+        board.G,
+        board.O
+      ];
+    }
 
-      cards.forEach(card => {
-        const button = document.createElement("button");
+    /*
+      Also support an array format if the database
+      contains a 5x5 array.
+    */
 
-        button.className = "card-number";
-        button.textContent = card.cardNumber;
+    if (
+      Array.isArray(board) &&
+      board.length === 5
+    ) {
+      return board;
+    }
 
-        button.addEventListener("click", () => {
-          selectCard(card.cardNumber);
-        });
+    return null;
+  }
 
-        cardsContainer.appendChild(button);
-      });
+  function displayCards() {
+    cardList.innerHTML = "";
 
-      message.textContent = "Choose one card from 1–100.";
+    for (let i = 1; i <= 100; i++) {
 
-      await loadMyCard();
+      const button =
+        document.createElement("button");
 
-    } catch (error) {
-      console.error(error);
-      message.textContent = "Error loading cards: " + error.message;
+      button.className = "card-button";
+      button.textContent = i;
+
+      button.dataset.cardNumber = i;
+
+      button.addEventListener(
+        "click",
+        () => {
+          selectPreview(i);
+        }
+      );
+
+      cardList.appendChild(button);
     }
   }
 
-  /*
-   * Select a card and show its preview.
-   */
-  function selectCard(cardNumber) {
-    selectedCard = cardNumber;
-
-    document.querySelectorAll(".card-number").forEach(button => {
-      button.classList.remove("selected");
-
-      if (Number(button.textContent) === cardNumber) {
-        button.classList.add("selected");
-      }
-    });
-
+  function selectPreview(cardNumber) {
     const card = cards.find(
-      item => Number(item.cardNumber) === Number(cardNumber)
+      c =>
+        Number(c.card_number) ===
+        Number(cardNumber)
     );
 
     if (!card) {
+      showError(
+        "Card #" +
+        cardNumber +
+        " could not be loaded."
+      );
       return;
     }
 
-    showPreview(card);
+    selectedCardNumber = cardNumber;
 
-    okButton.disabled = false;
-  }
-
-  /*
-   * Display the 5x5 Bingo board.
-   */
-  function showPreview(card) {
-    preview.style.display = "block";
-
-    previewTitle.textContent = `Card #${card.cardNumber}`;
-
-    board.innerHTML = "";
-
-    const headers = ["B", "I", "N", "G", "O"];
-
-    headers.forEach(letter => {
-      const cell = document.createElement("div");
-
-      cell.className = "cell header";
-      cell.textContent = letter;
-
-      board.appendChild(cell);
-    });
-
-    for (let row = 0; row < 5; row++) {
-      for (let col = 0; col < 5; col++) {
-
-        const cell = document.createElement("div");
-        cell.className = "cell";
-
-        if (row === 2 && col === 2) {
-          cell.classList.add("free");
-          cell.textContent = "FREE";
-        } else {
-          const value = card.card[row][col];
-          cell.textContent = value;
-        }
-
-        board.appendChild(cell);
-      }
-    }
-
-    preview.scrollIntoView({
-      behavior: "smooth",
-      block: "center"
-    });
-  }
-
-  /*
-   * Confirm selected card.
-   */
-  okButton.addEventListener("click", async () => {
-
-    if (!selectedCard) {
-      return;
-    }
-
-    try {
-      okButton.disabled = true;
-      okButton.textContent = "Saving...";
-
-      const data = await api("/api/select-card", {
-        method: "POST",
-        body: JSON.stringify({
-          initData: initData,
-          cardNumber: selectedCard
-        })
+    document
+      .querySelectorAll(".card-button")
+      .forEach(button => {
+        button.classList.remove(
+          "selected"
+        );
       });
 
-      message.textContent =
-        `✅ Card #${data.cardNumber} selected successfully.`;
+    const selectedButton =
+      document.querySelector(
+        `.card-button[data-card-number="${cardNumber}"]`
+      );
 
-      okButton.textContent = "Selected ✓";
+    if (selectedButton) {
+      selectedButton.classList.add(
+        "selected"
+      );
+    }
+
+    previewTitle.textContent =
+      `🎯 Card #${cardNumber}`;
+
+    const rows =
+      normalizeBoard(card.board);
+
+    if (!rows) {
+      showError(
+        "This card has an invalid Bingo board."
+      );
+      return;
+    }
+
+    boardBody.innerHTML = "";
+
+    for (
+      let row = 0;
+      row < 5;
+      row++
+    ) {
+
+      const tr =
+        document.createElement("tr");
+
+      for (
+        let col = 0;
+        col < 5;
+        col++
+      ) {
+
+        const td =
+          document.createElement("td");
+
+        const value =
+          rows[col][row];
+
+        td.textContent = value;
+
+        if (
+          String(value).toUpperCase() ===
+          "FREE"
+        ) {
+          td.classList.add("free");
+        }
+
+        tr.appendChild(td);
+      }
+
+      boardBody.appendChild(tr);
+    }
+
+    previewSection.style.display =
+      "block";
+
+    selectedMessage.style.display =
+      "none";
+
+    okButton.disabled = false;
+
+    previewSection.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }
+
+  async function loadCards() {
+    try {
+      hideError();
+
+      const data =
+        await getJSON("/api/cards");
+
+      if (!Array.isArray(data)) {
+        throw new Error(
+          "Cards data is not valid."
+        );
+      }
+
+      cards = data;
+
+      if (cards.length === 0) {
+        throw new Error(
+          "No Bingo cards were found."
+        );
+      }
+
+      displayCards();
+
+      loading.style.display = "none";
+      game.style.display = "block";
 
       /*
-       * Keep the preview visible.
-       * Actual Bingo gameplay will be added next.
-       */
+        Restore the user's previously selected card
+        if one exists.
+      */
+
+      if (initData) {
+        try {
+          const mine =
+            await getJSON(
+              `/api/my-card?initData=${encodeURIComponent(initData)}`
+            );
+
+          if (
+            mine &&
+            mine.cardNumber
+          ) {
+            selectPreview(
+              Number(mine.cardNumber)
+            );
+
+            selectedMessage.style.display =
+              "block";
+
+            selectedMessage.textContent =
+              `✅ Your selected card is #${mine.cardNumber}`;
+          }
+        } catch (restoreError) {
+          console.log(
+            "Could not restore previous card:",
+            restoreError
+          );
+        }
+      }
 
     } catch (error) {
       console.error(error);
 
-      message.textContent =
-        "Error selecting card: " + error.message;
-
-      okButton.disabled = false;
-      okButton.textContent = "OK";
-    }
-  });
-
-  /*
-   * Restore player's previously selected card.
-   */
-  async function loadMyCard() {
-    try {
-
-      if (!initData) {
-        message.textContent =
-          "Please open this page from the Telegram bot.";
-
-        return;
-      }
-
-      const data = await api(
-        `/api/my-card?initData=${encodeURIComponent(initData)}`
+      showError(
+        error.message ||
+        "Could not load Bingo cards."
       );
-
-      if (data.cardNumber) {
-        selectCard(Number(data.cardNumber));
-
-        message.textContent =
-          `Your selected card is #${data.cardNumber}.`;
-      }
-
-    } catch (error) {
-      console.log("No previous card:", error.message);
     }
   }
 
-  /*
-   * Start.
-   */
+  okButton.addEventListener(
+    "click",
+    async () => {
+
+      if (!selectedCardNumber) {
+        return;
+      }
+
+      if (!initData) {
+        showError(
+          "Telegram user information was not received. Please open the game from Telegram."
+        );
+        return;
+      }
+
+      okButton.disabled = true;
+      okButton.textContent =
+        "Saving...";
+
+      hideError();
+
+      try {
+
+        const result =
+          await getJSON(
+            "/api/select-card",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                initData:
+                  initData,
+                cardNumber:
+                  selectedCardNumber
+              })
+            }
+          );
+
+        if (
+          !result ||
+          !result.success
+        ) {
+          throw new Error(
+            result.error ||
+            "Could not select card."
+          );
+        }
+
+        selectedMessage.style.display =
+          "block";
+
+        selectedMessage.textContent =
+          `✅ Card #${selectedCardNumber} selected successfully!`;
+
+        okButton.textContent =
+          "✅ Card Selected";
+
+        tg.HapticFeedback?.notificationOccurred(
+          "success"
+        );
+
+      } catch (error) {
+
+        console.error(error);
+
+        showError(
+          error.message ||
+          "Could not select this card."
+        );
+
+        okButton.disabled = false;
+
+        okButton.textContent =
+          "✅ OK — Select This Card";
+      }
+    }
+  );
+
   loadCards();
 </script>
 
