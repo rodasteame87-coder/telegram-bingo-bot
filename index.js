@@ -6,6 +6,10 @@ const path = require("path");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const DATABASE_URL = process.env.DATABASE_URL;
+const PORT = process.env.PORT || 3000;
+
+const WEBHOOK_URL =
+  "https://telegram-bingo-bot-q54q.onrender.com/telegram-webhook";
 
 if (!BOT_TOKEN) {
   console.error("BOT_TOKEN is missing");
@@ -25,6 +29,10 @@ const pool = new Pool({
     rejectUnauthorized: false
   }
 });
+
+/* =========================
+   DATABASE
+========================= */
 
 async function initDatabase() {
   await pool.query(`
@@ -58,6 +66,10 @@ async function initDatabase() {
 
   console.log("Database initialized");
 }
+
+/* =========================
+   BINGO CARD
+========================= */
 
 function generateCard() {
   const ranges = [
@@ -102,16 +114,15 @@ function generateCard() {
   return card;
 }
 
-function cardContainsNumber(card, number) {
-  return card.some(row => row.includes(number));
-}
+/* =========================
+   BINGO CHECK
+========================= */
 
 function checkBingo(card, markedNumbers) {
   const marked = new Set(markedNumbers);
 
-  function isMarked(value) {
-    return value === "FREE" || marked.has(value);
-  }
+  const isMarked = value =>
+    value === "FREE" || marked.has(value);
 
   // Rows
   for (let row = 0; row < 5; row++) {
@@ -136,7 +147,7 @@ function checkBingo(card, markedNumbers) {
     }
   }
 
-  // Main diagonal
+  // Diagonal
   if (
     isMarked(card[0][0]) &&
     isMarked(card[1][1]) &&
@@ -160,6 +171,14 @@ function checkBingo(card, markedNumbers) {
 
   return false;
 }
+
+function cardContainsNumber(card, number) {
+  return card.some(row => row.includes(number));
+}
+
+/* =========================
+   /newgame
+========================= */
 
 bot.command("newgame", async ctx => {
   try {
@@ -201,10 +220,15 @@ bot.command("newgame", async ctx => {
   }
 });
 
+/* =========================
+   /join
+========================= */
+
 bot.command("join", async ctx => {
   try {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
+
     const name =
       ctx.from.first_name ||
       ctx.from.username ||
@@ -232,7 +256,7 @@ bot.command("join", async ctx => {
 
     if (existing.rows.length > 0) {
       return ctx.reply(
-        "You already joined this game. Use /play to open your card."
+        "You already joined this game.\nUse /play to open your card."
       );
     }
 
@@ -263,6 +287,10 @@ bot.command("join", async ctx => {
   }
 });
 
+/* =========================
+   /players
+========================= */
+
 bot.command("players", async ctx => {
   try {
     const chatId = ctx.chat.id;
@@ -284,7 +312,9 @@ bot.command("players", async ctx => {
     const text =
       "👥 Players:\n\n" +
       result.rows
-        .map((player, index) => `${index + 1}. ${player.name}`)
+        .map((player, index) =>
+          `${index + 1}. ${player.name}`
+        )
         .join("\n");
 
     await ctx.reply(text);
@@ -294,22 +324,26 @@ bot.command("players", async ctx => {
   }
 });
 
+/* =========================
+   /call
+========================= */
+
 bot.command("call", async ctx => {
   try {
     const chatId = ctx.chat.id;
 
-    const gameResult = await pool.query(
+    const result = await pool.query(
       `SELECT * FROM games WHERE chat_id = $1`,
       [chatId]
     );
 
-    if (gameResult.rows.length === 0) {
+    if (result.rows.length === 0) {
       return ctx.reply(
         "❌ No active game. Use /newgame first."
       );
     }
 
-    const game = gameResult.rows[0];
+    const game = result.rows[0];
 
     if (game.winner) {
       return ctx.reply(
@@ -317,7 +351,8 @@ bot.command("call", async ctx => {
       );
     }
 
-    const calledNumbers = game.called_numbers || [];
+    const calledNumbers =
+      game.called_numbers || [];
 
     if (calledNumbers.length >= 75) {
       return ctx.reply(
@@ -356,9 +391,14 @@ bot.command("call", async ctx => {
   }
 });
 
+/* =========================
+   /play
+========================= */
+
 bot.command("play", async ctx => {
   try {
     const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
 
     const gameResult = await pool.query(
       `SELECT * FROM games WHERE chat_id = $1`,
@@ -377,7 +417,7 @@ bot.command("play", async ctx => {
       FROM players
       WHERE chat_id = $1 AND user_id = $2
       `,
-      [chatId, ctx.from.id]
+      [chatId, userId]
     );
 
     if (playerResult.rows.length === 0) {
@@ -397,6 +437,10 @@ bot.command("play", async ctx => {
     await ctx.reply("❌ Could not open the Bingo card.");
   }
 });
+
+/* =========================
+   /bingo
+========================= */
 
 bot.command("bingo", async ctx => {
   try {
@@ -437,12 +481,9 @@ bot.command("bingo", async ctx => {
 
     const player = playerResult.rows[0];
 
-    const markedNumbers =
-      player.marked_numbers || [];
-
     const valid = checkBingo(
       player.card,
-      markedNumbers
+      player.marked_numbers || []
     );
 
     if (!valid) {
@@ -451,19 +492,17 @@ bot.command("bingo", async ctx => {
       );
     }
 
-    const winnerName = player.name;
-
     await pool.query(
       `
       UPDATE games
       SET winner = $1
       WHERE chat_id = $2
       `,
-      [winnerName, chatId]
+      [player.name, chatId]
     );
 
     await ctx.reply(
-      `🎉 BINGO!\n\n🏆 ${winnerName} wins the game!`
+      `🎉 BINGO!\n\n🏆 ${player.name} wins the game!`
     );
   } catch (error) {
     console.error(error);
@@ -471,21 +510,25 @@ bot.command("bingo", async ctx => {
   }
 });
 
+/* =========================
+   /endgame
+========================= */
+
 bot.command("endgame", async ctx => {
   try {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
 
-    const gameResult = await pool.query(
+    const result = await pool.query(
       `SELECT * FROM games WHERE chat_id = $1`,
       [chatId]
     );
 
-    if (gameResult.rows.length === 0) {
+    if (result.rows.length === 0) {
       return ctx.reply("❌ No active game.");
     }
 
-    const game = gameResult.rows[0];
+    const game = result.rows[0];
 
     if (String(game.host_id) !== String(userId)) {
       return ctx.reply(
@@ -498,18 +541,49 @@ bot.command("endgame", async ctx => {
       [chatId]
     );
 
-    await ctx.reply(
-      "🛑 Bingo game ended."
-    );
+    await ctx.reply("🛑 Bingo game ended.");
   } catch (error) {
     console.error(error);
     await ctx.reply("❌ Could not end the game.");
   }
 });
 
-/*
-  API
-*/
+/* =========================
+   API HELPERS
+========================= */
+
+function sendJson(res, status, data) {
+  res.writeHead(status, {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*"
+  });
+
+  res.end(JSON.stringify(data));
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+
+    req.on("data", chunk => {
+      body += chunk;
+    });
+
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(body || "{}"));
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    req.on("error", reject);
+  });
+}
+
+/* =========================
+   /api/card
+========================= */
 
 async function getCard(req, res) {
   try {
@@ -583,25 +657,9 @@ async function getCard(req, res) {
   }
 }
 
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = "";
-
-    req.on("data", chunk => {
-      body += chunk;
-    });
-
-    req.on("end", () => {
-      try {
-        resolve(JSON.parse(body || "{}"));
-      } catch (error) {
-        reject(error);
-      }
-    });
-
-    req.on("error", reject);
-  });
-}
+/* =========================
+   MARK / UNMARK
+========================= */
 
 async function markNumber(req, res, shouldMark) {
   try {
@@ -658,9 +716,8 @@ async function markNumber(req, res, shouldMark) {
     }
 
     const game = gameResult.rows[0];
-    const calledNumbers = game.called_numbers || [];
 
-    if (!calledNumbers.includes(number)) {
+    if (!(game.called_numbers || []).includes(number)) {
       return sendJson(res, 400, {
         error: "Number has not been called"
       });
@@ -703,6 +760,10 @@ async function markNumber(req, res, shouldMark) {
     });
   }
 }
+
+/* =========================
+   /api/bingo
+========================= */
 
 async function bingoApi(req, res) {
   try {
@@ -754,12 +815,9 @@ async function bingoApi(req, res) {
 
     const player = playerResult.rows[0];
 
-    const markedNumbers =
-      player.marked_numbers || [];
-
     const valid = checkBingo(
       player.card,
-      markedNumbers
+      player.marked_numbers || []
     );
 
     if (!valid) {
@@ -795,14 +853,9 @@ async function bingoApi(req, res) {
   }
 }
 
-function sendJson(res, status, data) {
-  res.writeHead(status, {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*"
-  });
-
-  res.end(JSON.stringify(data));
-}
+/* =========================
+   MINI APP
+========================= */
 
 function serveMiniApp(res) {
   const filePath = path.join(
@@ -832,23 +885,40 @@ function serveMiniApp(res) {
   });
 }
 
+/* =========================
+   HTTP SERVER
+========================= */
+
 const server = http.createServer(async (req, res) => {
   try {
+    // Telegram webhook
+    if (
+      req.method === "POST" &&
+      req.url === "/telegram-webhook"
+    ) {
+      const update = await readBody(req);
+
+      await bot.handleUpdate(update);
+
+      res.writeHead(200);
+      return res.end("OK");
+    }
+
     const url = new URL(
       req.url,
       `http://${req.headers.host}`
     );
 
-    // IMPORTANT:
-    // Both / and /miniapp now open the Mini App.
+    // Mini App
     if (
       req.method === "GET" &&
       (url.pathname === "/" ||
-        url.pathname === "/miniapp")
+       url.pathname === "/miniapp")
     ) {
       return serveMiniApp(res);
     }
 
+    // Card API
     if (
       req.method === "GET" &&
       url.pathname === "/api/card"
@@ -856,6 +926,7 @@ const server = http.createServer(async (req, res) => {
       return getCard(req, res);
     }
 
+    // Mark
     if (
       req.method === "POST" &&
       url.pathname === "/api/mark"
@@ -863,6 +934,7 @@ const server = http.createServer(async (req, res) => {
       return markNumber(req, res, true);
     }
 
+    // Unmark
     if (
       req.method === "POST" &&
       url.pathname === "/api/unmark"
@@ -870,6 +942,7 @@ const server = http.createServer(async (req, res) => {
       return markNumber(req, res, false);
     }
 
+    // Bingo
     if (
       req.method === "POST" &&
       url.pathname === "/api/bingo"
@@ -882,6 +955,7 @@ const server = http.createServer(async (req, res) => {
     });
 
     res.end("Not found");
+
   } catch (error) {
     console.error(error);
 
@@ -893,37 +967,58 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+/* =========================
+   START
+========================= */
 
-async function start() {
+// Start HTTP server FIRST.
+// This prevents Render from reporting
+// "No open ports detected".
+
+server.listen(PORT, async () => {
+  console.log(`HTTP server running on port ${PORT}`);
+
   try {
     await initDatabase();
 
-    await bot.launch();
+    // Remove any old webhook first.
+    await bot.telegram.deleteWebhook();
 
-    server.listen(PORT, () => {
-      console.log(
-        `HTTP server running on port ${PORT}`
-      );
-    });
+    // Set the new webhook.
+    await bot.telegram.setWebhook(WEBHOOK_URL);
 
-    console.log("Telegram bot started");
-  } catch (error) {
-    console.error(
-      "Failed to start application:",
-      error
+    console.log(
+      "Telegram webhook configured successfully"
     );
 
-    process.exit(1);
+    console.log(
+      `Webhook URL: ${WEBHOOK_URL}`
+    );
+
+  } catch (error) {
+    console.error(
+      "Startup error:",
+      error
+    );
   }
-}
-
-start();
-
-process.once("SIGINT", () => {
-  bot.stop("SIGINT");
 });
 
-process.once("SIGTERM", () => {
-  bot.stop("SIGTERM");
+/* =========================
+   SHUTDOWN
+========================= */
+
+process.once("SIGINT", async () => {
+  try {
+    await bot.telegram.deleteWebhook();
+  } catch (e) {}
+
+  process.exit(0);
+});
+
+process.once("SIGTERM", async () => {
+  try {
+    await bot.telegram.deleteWebhook();
+  } catch (e) {}
+
+  process.exit(0);
 });
