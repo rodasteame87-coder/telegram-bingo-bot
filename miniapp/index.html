@@ -1,16 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-  >
-
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Bingo</title>
-
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <style>
     * {
@@ -19,1042 +12,899 @@
 
     body {
       margin: 0;
-      padding: 0;
-      background: #f2f4f7;
       font-family: Arial, sans-serif;
-      color: #111;
+      background: #f2edff;
+      color: #241b35;
     }
 
-    .container {
-      max-width: 500px;
+    .page {
+      max-width: 700px;
       margin: auto;
-      padding: 15px;
+      padding: 16px;
     }
 
     h1 {
       text-align: center;
-      margin: 5px 0 15px;
+      margin: 5px 0 18px;
+      color: #5d35a8;
     }
 
-    .screen {
-      display: none;
+    .panel {
+      background: white;
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 15px rgba(0,0,0,.08);
     }
 
-    .screen.active {
-      display: block;
+    .hidden {
+      display: none !important;
     }
 
-    .card-grid {
+    .title {
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+      margin-bottom: 14px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #777;
+      margin-bottom: 15px;
+    }
+
+    #cardList {
       display: grid;
-      grid-template-columns:
-        repeat(5, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 8px;
     }
 
-    .card-button {
-      border: none;
-      background: white;
-      border-radius: 10px;
-      padding: 15px 5px;
-      font-size: 18px;
+    .card-choice {
+      border: 0;
+      border-radius: 12px;
+      padding: 13px 5px;
+      font-size: 16px;
       font-weight: bold;
-      box-shadow:
-        0 2px 5px rgba(0,0,0,0.12);
-    }
-
-    .card-button.selected {
-      background: #1687ff;
-      color: white;
-    }
-
-    .preview {
-      margin-top: 18px;
-      background: white;
-      border-radius: 15px;
-      padding: 15px;
-      box-shadow:
-        0 2px 8px rgba(0,0,0,0.12);
-    }
-
-    .preview h2 {
-      text-align: center;
-      margin-top: 0;
-    }
-
-    .bingo-board {
-      display: grid;
-      grid-template-columns:
-        repeat(5, 1fr);
-      gap: 5px;
-    }
-
-    .board-header {
-      background: #1687ff;
-      color: white;
-      font-weight: bold;
-      padding: 9px 2px;
-      text-align: center;
-      border-radius: 5px;
-    }
-
-    .cell {
-      background: #f8f8f8;
-      border: 1px solid #ddd;
-      min-height: 52px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 15px;
-      border-radius: 5px;
+      background: #e8e0ff;
+      color: #4d287f;
       cursor: pointer;
     }
 
-    .cell.free {
-      background: #ffd54a;
-    }
-
-    .cell.marked {
-      background: #20b26b;
+    .card-choice.selected {
+      background: #7040c5;
       color: white;
     }
 
-    .ok-button,
-    .bingo-button {
+    .card-choice.used {
+      background: #ccc;
+      color: #777;
+      cursor: not-allowed;
+    }
+
+    #previewBoard,
+    #gameBoard {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+      margin-top: 12px;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: #eee9fa;
+      font-weight: bold;
+      font-size: clamp(14px, 4vw, 20px);
+    }
+
+    .header-cell {
+      background: #7040c5;
+      color: white;
+    }
+
+    .free {
+      background: #8c61d1;
+      color: white;
+    }
+
+    .marked {
+      background: #39a852 !important;
+      color: white;
+    }
+
+    button.action {
       width: 100%;
-      border: none;
-      border-radius: 12px;
+      border: 0;
+      border-radius: 14px;
       padding: 15px;
       margin-top: 15px;
+      background: #7040c5;
+      color: white;
       font-size: 18px;
       font-weight: bold;
-      background: #20a464;
-      color: white;
     }
 
-    .back-button {
-      width: 100%;
-      border: none;
-      border-radius: 12px;
-      padding: 12px;
-      margin-top: 10px;
-      font-size: 16px;
-      background: #ddd;
+    button.action:disabled {
+      background: #bbb;
     }
 
     .game-info {
-      background: white;
-      border-radius: 15px;
-      padding: 15px;
-      margin-bottom: 15px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .info {
+      background: #f1ebff;
+      border-radius: 12px;
+      padding: 12px;
       text-align: center;
-      box-shadow:
-        0 2px 8px rgba(0,0,0,0.12);
+    }
+
+    .info small {
+      display: block;
+      color: #777;
+    }
+
+    .info strong {
+      font-size: 20px;
+    }
+
+    .current-call {
+      text-align: center;
+      background: #7040c5;
+      color: white;
+      border-radius: 18px;
+      padding: 18px;
+      margin: 15px 0;
+    }
+
+    .current-call small {
+      display: block;
+      opacity: .8;
     }
 
     .current-number {
-      font-size: 45px;
-      font-weight: bold;
-      margin: 8px 0;
-      color: #1687ff;
-    }
-
-    .status {
+      font-size: 42px;
       font-weight: bold;
       margin-top: 5px;
     }
 
-    .history {
+    #calledNumbers {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-      margin-top: 12px;
-      justify-content: center;
+      margin-top: 10px;
     }
 
-    .history-number {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: #1687ff;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .called {
+      background: #e8e0ff;
+      border-radius: 8px;
+      padding: 7px 9px;
       font-weight: bold;
     }
 
-    .game-card-title {
+    .winner {
+      background: #e7f7e9;
+      border: 2px solid #39a852;
+      color: #20732e;
+      border-radius: 16px;
+      padding: 18px;
       text-align: center;
-      font-size: 20px;
-      font-weight: bold;
-      margin-bottom: 10px;
+      margin-bottom: 15px;
     }
 
-    .message {
-      text-align: center;
-      margin-top: 12px;
+    .winner-number {
+      font-size: 30px;
       font-weight: bold;
-      min-height: 22px;
     }
 
-    .small {
+    .game-over {
+      background: #fff0f0;
+      border: 2px solid #e05a5a;
+      color: #a52d2d;
+      border-radius: 16px;
+      padding: 25px 15px;
       text-align: center;
-      color: #666;
-      font-size: 13px;
-      margin-top: 8px;
+      margin-bottom: 15px;
+    }
+
+    .game-over h2 {
+      margin: 0 0 8px;
     }
 
     .loading {
       text-align: center;
-      padding: 30px;
-      font-size: 18px;
+      padding: 25px;
+      color: #777;
+    }
+
+    @media (max-width: 400px) {
+      .page {
+        padding: 10px;
+      }
+
+      #cardList {
+        gap: 5px;
+      }
+
+      .card-choice {
+        padding: 11px 3px;
+      }
     }
   </style>
 </head>
 
 <body>
 
-<div class="container">
+<div class="page">
 
   <!-- CARD SELECTION -->
+  <section id="selectionScreen" class="panel">
+    <h1>🎱 BINGO</h1>
 
-  <div
-    id="selectionScreen"
-    class="screen active"
-  >
+    <div class="title">Choose Your Card</div>
+    <div class="subtitle">Choose one number from 1–100</div>
 
-    <h1>🎯 Choose Your Bingo Card</h1>
+    <div id="selectionMessage" class="subtitle"></div>
 
-    <div
-      id="cardGrid"
-      class="card-grid"
-    ></div>
+    <div id="cardList"></div>
 
-    <div
-      id="preview"
-      class="preview"
-      style="display:none;"
-    >
-      <h2 id="previewTitle">
-        Card
-      </h2>
+    <div id="previewSection" class="hidden">
+      <div class="title" style="margin-top:20px;">
+        Card #<span id="previewNumber"></span>
+      </div>
 
-      <div
-        id="previewBoard"
-        class="bingo-board"
-      ></div>
+      <div id="previewBoard"></div>
 
-      <button
-        id="okButton"
-        class="ok-button"
-      >
-        ✅ OK — Choose This Card
+      <button id="confirmButton" class="action">
+        OK — Choose This Card
       </button>
     </div>
-
-    <div
-      id="selectionMessage"
-      class="message"
-    ></div>
-
-  </div>
+  </section>
 
 
-  <!-- GAME SCREEN -->
+  <!-- GAME -->
+  <section id="gameScreen" class="hidden">
 
-  <div
-    id="gameScreen"
-    class="screen"
-  >
+    <div class="panel">
 
-    <h1>🎯 BINGO</h1>
+      <div class="title">🎱 BINGO GAME</div>
 
-    <div class="game-info">
+      <div class="game-info">
+        <div class="info">
+          <small>Game</small>
+          <strong id="gameId">-</strong>
+        </div>
+
+        <div class="info">
+          <small>Status</small>
+          <strong id="gameStatus">-</strong>
+        </div>
+      </div>
+
+      <div id="winnerBox" class="winner hidden">
+        <div>🏆 WINNER</div>
+        <div id="winnerName" style="font-size:22px;font-weight:bold;"></div>
+        <div style="margin-top:8px;">Winning Card</div>
+        <div class="winner-number">
+          #<span id="winnerCard"></span>
+        </div>
+      </div>
+
+      <div id="gameOverBox" class="game-over hidden">
+        <h2>GAME OVER</h2>
+        <div>Better luck next time!</div>
+        <div style="margin-top:12px;">
+          Returning to card selection...
+        </div>
+      </div>
+
+      <div class="current-call">
+        <small>Current Number</small>
+        <div id="currentNumber" class="current-number">—</div>
+      </div>
 
       <div>
-        Game #<span id="gameId">-</span>
+        <strong>Called Numbers</strong>
+        <div id="calledNumbers"></div>
       </div>
 
-      <div
-        id="gameStatus"
-        class="status"
-      >
-        Loading game...
+      <div class="title" style="margin-top:20px;">
+        Your Card #<span id="myCardNumber">-</span>
       </div>
 
-      <div class="small">
-        Latest Number
-      </div>
+      <div id="gameBoard"></div>
 
-      <div
-        id="currentNumber"
-        class="current-number"
-      >
-        -
-      </div>
-
-      <div class="small">
-        Called Numbers:
-        <span id="calledCount">0</span>/75
-      </div>
-
-      <div
-        id="history"
-        class="history"
-      ></div>
+      <button id="bingoButton" class="action">
+        🎉 BINGO!
+      </button>
 
     </div>
+  </section>
 
-    <div class="game-card-title">
-      Your Card #<span id="gameCardNumber">-</span>
-    </div>
-
-    <div
-      id="gameBoard"
-      class="bingo-board"
-    ></div>
-
-    <button
-      id="bingoButton"
-      class="bingo-button"
-    >
-      🎉 BINGO!
-    </button>
-
-    <div
-      id="gameMessage"
-      class="message"
-    ></div>
-
-    <button
-      id="backButton"
-      class="back-button"
-    >
-      🔙 Change Card
-    </button>
-
+  <div id="loading" class="loading hidden">
+    Loading...
   </div>
 
 </div>
 
+
 <script>
-  const tg =
-    window.Telegram &&
-    window.Telegram.WebApp
-      ? window.Telegram.WebApp
-      : null;
+(function () {
+
+  const tg = window.Telegram && window.Telegram.WebApp;
 
   if (tg) {
     tg.ready();
     tg.expand();
   }
 
-  const initData =
-    tg
-      ? tg.initData
-      : "";
+  const initData = tg ? tg.initData : "";
 
-  let cards = [];
-  let selectedCardNumber = null;
-  let selectedBoard = null;
+  let cards = {};
+  let selectedCard = null;
+  let myCard = null;
 
-  let gameBoard = null;
+  let currentGameId = null;
+  let calledNumbers = [];
   let markedNumbers = [];
 
   let gamePolling = null;
+  let returnTimer = null;
 
 
-  async function api(
-    url,
-    options = {}
-  ) {
-    const response =
-      await fetch(
-        url,
-        options
-      );
+  const selectionScreen = document.getElementById("selectionScreen");
+  const gameScreen = document.getElementById("gameScreen");
 
-    const data =
-      await response.json();
+  const cardList = document.getElementById("cardList");
+  const previewSection = document.getElementById("previewSection");
+  const previewBoard = document.getElementById("previewBoard");
+  const previewNumber = document.getElementById("previewNumber");
+  const confirmButton = document.getElementById("confirmButton");
+  const selectionMessage = document.getElementById("selectionMessage");
 
-    if (!response.ok) {
-      throw new Error(
-        data.error ||
-        "Request failed"
-      );
+  const gameIdEl = document.getElementById("gameId");
+  const gameStatusEl = document.getElementById("gameStatus");
+  const currentNumberEl = document.getElementById("currentNumber");
+  const calledNumbersEl = document.getElementById("calledNumbers");
+  const gameBoard = document.getElementById("gameBoard");
+  const myCardNumberEl = document.getElementById("myCardNumber");
+
+  const bingoButton = document.getElementById("bingoButton");
+
+  const winnerBox = document.getElementById("winnerBox");
+  const winnerName = document.getElementById("winnerName");
+  const winnerCard = document.getElementById("winnerCard");
+
+  const gameOverBox = document.getElementById("gameOverBox");
+
+
+  function showSelection() {
+    selectionScreen.classList.remove("hidden");
+    gameScreen.classList.add("hidden");
+
+    winnerBox.classList.add("hidden");
+    gameOverBox.classList.add("hidden");
+
+    selectedCard = null;
+    previewSection.classList.add("hidden");
+  }
+
+
+  function showGame() {
+    selectionScreen.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+  }
+
+
+  function boardArray(board) {
+    if (Array.isArray(board)) return board;
+
+    try {
+      return JSON.parse(board);
+    } catch (e) {
+      return [];
+    }
+  }
+
+
+  function renderBoard(container, board, marks, clickable) {
+
+    container.innerHTML = "";
+
+    const b = boardArray(board);
+    const marked = new Set((marks || []).map(Number));
+
+    if (!Array.isArray(b) || b.length !== 5) {
+      container.innerHTML =
+        "<div style='grid-column:1/-1;text-align:center'>Board unavailable</div>";
+      return;
     }
 
-    return data;
+    const letters = ["B", "I", "N", "G", "O"];
+
+    letters.forEach(letter => {
+      const cell = document.createElement("div");
+      cell.className = "cell header-cell";
+      cell.textContent = letter;
+      container.appendChild(cell);
+    });
+
+    for (let r = 0; r < 5; r++) {
+
+      for (let c = 0; c < 5; c++) {
+
+        const value = b[r][c];
+
+        const cell = document.createElement("div");
+        cell.className = "cell";
+
+        if (r === 2 && c === 2) {
+          cell.textContent = "FREE";
+          cell.classList.add("free");
+          container.appendChild(cell);
+          continue;
+        }
+
+        cell.textContent = value;
+
+        if (marked.has(Number(value))) {
+          cell.classList.add("marked");
+        }
+
+        if (clickable) {
+
+          const isCalled =
+            calledNumbers.includes(Number(value));
+
+          if (isCalled) {
+            cell.style.cursor = "pointer";
+
+            cell.addEventListener("click", async function () {
+
+              if (marked.has(Number(value))) {
+                await unmarkNumber(Number(value));
+              } else {
+                await markNumber(Number(value));
+              }
+
+            });
+          } else {
+            cell.style.opacity = "0.55";
+          }
+        }
+
+        container.appendChild(cell);
+      }
+    }
   }
 
 
   async function loadCards() {
+
     try {
 
-      const data =
-        await api(
-          "/api/cards"
-        );
+      const response = await fetch("/api/cards");
+      const data = await response.json();
 
-      cards = data;
+      cards = data.cards || {};
 
-      renderCardButtons();
-
-      await loadMyCard();
+      renderCardChoices(data.usedCards || []);
 
     } catch (error) {
 
-      document.getElementById(
-        "selectionMessage"
-      ).textContent =
-        "❌ " +
-        error.message;
+      selectionMessage.textContent =
+        "Unable to load cards. Please try again.";
+
+      console.error(error);
     }
   }
 
 
-  function renderCardButtons() {
+  function renderCardChoices(usedCards) {
 
-    const grid =
-      document.getElementById(
-        "cardGrid"
-      );
+    cardList.innerHTML = "";
 
-    grid.innerHTML = "";
+    const used = new Set((usedCards || []).map(Number));
 
-    cards.forEach(card => {
+    for (let i = 1; i <= 100; i++) {
 
-      const button =
-        document.createElement(
-          "button"
-        );
+      const button = document.createElement("button");
 
-      button.className =
-        "card-button";
+      button.className = "card-choice";
+      button.textContent = i;
+      button.type = "button";
 
-      button.textContent =
-        card.card_number;
-
-      button.onclick =
-        () => previewCard(
-          card.card_number
-        );
-
-      grid.appendChild(
-        button
-      );
-    });
-  }
-
-
-  function previewCard(
-    cardNumber
-  ) {
-
-    const card =
-      cards.find(
-        c =>
-          c.card_number ===
-          cardNumber
-      );
-
-    if (!card) {
-      return;
-    }
-
-    selectedCardNumber =
-      cardNumber;
-
-    selectedBoard =
-      card.board;
-
-    document.getElementById(
-      "preview"
-    ).style.display =
-      "block";
-
-    document.getElementById(
-      "previewTitle"
-    ).textContent =
-      "🎯 Card #" +
-      cardNumber;
-
-    renderBoard(
-      selectedBoard,
-      document.getElementById(
-        "previewBoard"
-      ),
-      []
-    );
-
-    document.querySelectorAll(
-      ".card-button"
-    ).forEach(
-      button => {
-        button.classList.toggle(
-          "selected",
-          Number(
-            button.textContent
-          ) === cardNumber
-        );
+      if (used.has(i)) {
+        button.classList.add("used");
+        button.disabled = true;
       }
-    );
 
-    document.getElementById(
-      "selectionMessage"
-    ).textContent =
-      "Preview your card and press OK.";
+      button.addEventListener("click", function () {
+
+        selectedCard = i;
+
+        document
+          .querySelectorAll(".card-choice")
+          .forEach(x => x.classList.remove("selected"));
+
+        button.classList.add("selected");
+
+        previewNumber.textContent = i;
+
+        previewSection.classList.remove("hidden");
+
+        renderBoard(
+          previewBoard,
+          cards[String(i)] || cards[i],
+          [],
+          false
+        );
+
+        previewSection.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      });
+
+      cardList.appendChild(button);
+    }
   }
 
 
-  document.getElementById(
-    "okButton"
-  ).onclick =
-    async () => {
+  confirmButton.addEventListener("click", async function () {
 
-      if (
-        !selectedCardNumber
-      ) {
-        document.getElementById(
-          "selectionMessage"
-        ).textContent =
-          "Please choose a card first.";
+    if (!selectedCard) return;
 
+    confirmButton.disabled = true;
+    confirmButton.textContent = "Choosing...";
+
+    try {
+
+      const response = await fetch("/api/select-card", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          initData: initData,
+          cardNumber: selectedCard
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+
+        selectionMessage.textContent =
+          data.message || "This card is already taken.";
+
+        confirmButton.disabled = false;
+        confirmButton.textContent = "OK — Choose This Card";
+
+        await loadCards();
         return;
       }
 
-      try {
+      myCard = data.card;
+      markedNumbers = [];
 
-        const result =
-          await api(
-            "/api/select-card",
-            {
-              method: "POST",
+      await loadMyCard();
 
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
+      showGame();
 
-              body:
-                JSON.stringify({
-                  initData:
-                    initData,
+      await updateGameState();
 
-                  cardNumber:
-                    selectedCardNumber
-                })
-            }
-          );
+    } catch (error) {
 
-        selectedBoard =
-          result.board;
+      selectionMessage.textContent =
+        "Could not choose the card.";
 
-        markedNumbers = [];
+      confirmButton.disabled = false;
+      confirmButton.textContent = "OK — Choose This Card";
+    }
 
-        openGameScreen();
-
-      } catch (error) {
-
-        document.getElementById(
-          "selectionMessage"
-        ).textContent =
-          "❌ " +
-          error.message;
-      }
-    };
+  });
 
 
   async function loadMyCard() {
 
-    if (!initData) {
-      return;
-    }
-
     try {
 
-      const data =
-        await api(
-          "/api/my-card?initData=" +
-          encodeURIComponent(
-            initData
-          )
-        );
+      const response = await fetch(
+        "/api/my-card?initData=" +
+        encodeURIComponent(initData)
+      );
 
-      if (
-        data.cardNumber &&
-        data.board
-      ) {
+      const data = await response.json();
 
-        selectedCardNumber =
-          data.cardNumber;
-
-        selectedBoard =
-          data.board;
-
-        markedNumbers =
-          data.markedNumbers ||
-          [];
-
-        openGameScreen();
+      if (data.cardNumber) {
+        myCardNumberEl.textContent = data.cardNumber;
+        myCard = data.card;
+        markedNumbers = data.markedNumbers || [];
       }
 
     } catch (error) {
+      console.error(error);
+    }
+  }
 
-      console.log(
-        "MY CARD:",
-        error.message
+
+  function resetForNewGame(newGameId) {
+
+    currentGameId = newGameId;
+
+    calledNumbers = [];
+    markedNumbers = [];
+
+    currentNumberEl.textContent = "—";
+    calledNumbersEl.innerHTML = "";
+
+    winnerBox.classList.add("hidden");
+    gameOverBox.classList.add("hidden");
+
+    bingoButton.disabled = false;
+
+    if (myCard) {
+      renderBoard(
+        gameBoard,
+        myCard,
+        markedNumbers,
+        true
       );
     }
   }
 
 
-  function openGameScreen() {
-
-    document.getElementById(
-      "selectionScreen"
-    ).classList.remove(
-      "active"
-    );
-
-    document.getElementById(
-      "gameScreen"
-    ).classList.add(
-      "active"
-    );
-
-    document.getElementById(
-      "gameCardNumber"
-    ).textContent =
-      selectedCardNumber;
-
-    renderGameBoard();
-
-    loadGameState();
-
-    if (!gamePolling) {
-      gamePolling =
-        setInterval(
-          loadGameState,
-          2000
-        );
-    }
-  }
-
-
-  function renderGameBoard() {
-
-    renderBoard(
-      selectedBoard,
-      document.getElementById(
-        "gameBoard"
-      ),
-      markedNumbers
-    );
-  }
-
-
-  function renderBoard(
-    board,
-    element,
-    marks
-  ) {
-
-    element.innerHTML = "";
-
-    const headers =
-      [
-        "B",
-        "I",
-        "N",
-        "G",
-        "O"
-      ];
-
-    headers.forEach(
-      letter => {
-
-        const header =
-          document.createElement(
-            "div"
-          );
-
-        header.className =
-          "board-header";
-
-        header.textContent =
-          letter;
-
-        element.appendChild(
-          header
-        );
-      }
-    );
-
-    for (
-      let row = 0;
-      row < 5;
-      row++
-    ) {
-
-      for (
-        let col = 0;
-        col < 5;
-        col++
-      ) {
-
-        const column =
-          board[
-            headers[col]
-          ];
-
-        const value =
-          column[row];
-
-        const cell =
-          document.createElement(
-            "div"
-          );
-
-        cell.className =
-          "cell";
-
-        cell.textContent =
-          value;
-
-        if (
-          value === "FREE"
-        ) {
-
-          cell.classList.add(
-            "free"
-          );
-
-        } else {
-
-          const number =
-            Number(value);
-
-          if (
-            marks.includes(
-              number
-            )
-          ) {
-            cell.classList.add(
-              "marked"
-            );
-          }
-
-          cell.onclick =
-            () =>
-              toggleNumber(
-                number
-              );
-        }
-
-        element.appendChild(
-          cell
-        );
-      }
-    }
-  }
-
-
-  let calledNumbers = [];
-
-
-  async function loadGameState() {
+  async function updateGameState() {
 
     try {
 
-      const game =
-        await api(
-          "/api/game-state"
-        );
+      const response = await fetch("/api/game-state");
+      const state = await response.json();
+
+      const newGameId = Number(state.gameId);
+
+      /*
+       * IMPORTANT:
+       * When the server starts a new game, the old green marks,
+       * called numbers and winner screen are completely cleared.
+       */
+      if (
+        currentGameId !== null &&
+        newGameId !== currentGameId
+      ) {
+
+        resetForNewGame(newGameId);
+
+        /*
+         * The player's previous card has been released by the
+         * server. Return to choosing 1–100.
+         */
+        setTimeout(async function () {
+          showSelection();
+          await loadCards();
+          await loadMyCard();
+        }, 300);
+
+        return;
+      }
+
+      if (currentGameId === null) {
+        currentGameId = newGameId;
+      }
+
+      gameIdEl.textContent = newGameId;
+      gameStatusEl.textContent =
+        String(state.status || "").toUpperCase();
 
       calledNumbers =
-        game.calledNumbers ||
-        [];
+        (state.calledNumbers || []).map(Number);
 
-      document.getElementById(
-        "gameId"
-      ).textContent =
-        game.gameId || "-";
+      currentNumberEl.textContent =
+        state.currentNumber || "—";
 
-      document.getElementById(
-        "calledCount"
-      ).textContent =
-        calledNumbers.length;
+      calledNumbersEl.innerHTML = "";
 
-      document.getElementById(
-        "currentNumber"
-      ).textContent =
-        game.currentNumber ||
-        "-";
+      calledNumbers.slice().reverse().forEach(number => {
 
-      if (
-        game.status ===
-        "playing"
-      ) {
+        const item = document.createElement("span");
 
-        document.getElementById(
-          "gameStatus"
-        ).textContent =
-          "🟢 GAME IS LIVE";
+        item.className = "called";
+        item.textContent = number;
 
-      } else if (
-        game.status ===
-        "finished"
-      ) {
+        calledNumbersEl.appendChild(item);
+      });
 
-        document.getElementById(
-          "gameStatus"
-        ).textContent =
-          "🏁 GAME FINISHED";
 
-      } else {
+      if (state.status === "finished") {
 
-        document.getElementById(
-          "gameStatus"
-        ).textContent =
-          "⏳ WAITING";
+        bingoButton.disabled = true;
+
+        winnerBox.classList.remove("hidden");
+
+        winnerName.textContent =
+          state.winnerName || "Winner";
+
+        winnerCard.textContent =
+          state.winnerCardNumber || "?";
+
+        gameOverBox.classList.remove("hidden");
+
+        return;
       }
 
-      renderHistory(
-        calledNumbers
-      );
 
-      renderGameBoard();
+      gameOverBox.classList.add("hidden");
+      winnerBox.classList.add("hidden");
+
+      bingoButton.disabled = false;
+
+      if (myCard) {
+        renderBoard(
+          gameBoard,
+          myCard,
+          markedNumbers,
+          true
+        );
+      }
 
     } catch (error) {
-
-      document.getElementById(
-        "gameStatus"
-      ).textContent =
-        "❌ Connection error";
+      console.error("Game state error:", error);
     }
   }
 
 
-  function renderHistory(
-    numbers
-  ) {
+  async function markNumber(number) {
 
-    const history =
-      document.getElementById(
-        "history"
-      );
+    try {
 
-    history.innerHTML = "";
+      const response = await fetch("/api/mark", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          initData: initData,
+          number: number
+        })
+      });
 
-    const recent =
-      [...numbers]
-        .reverse()
-        .slice(0, 20);
+      const data = await response.json();
 
-    recent.forEach(
-      number => {
-
-        const item =
-          document.createElement(
-            "div"
-          );
-
-        item.className =
-          "history-number";
-
-        item.textContent =
-          number;
-
-        history.appendChild(
-          item
-        );
+      if (data.success) {
+        markedNumbers = data.markedNumbers || [];
+        renderBoard(gameBoard, myCard, markedNumbers, true);
       }
+
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+
+  async function unmarkNumber(number) {
+
+    try {
+
+      const response = await fetch("/api/unmark", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          initData: initData,
+          number: number
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        markedNumbers = data.markedNumbers || [];
+        renderBoard(gameBoard, myCard, markedNumbers, true);
+      }
+
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+
+  bingoButton.addEventListener("click", async function () {
+
+    bingoButton.disabled = true;
+    bingoButton.textContent = "Checking...";
+
+    try {
+
+      const response = await fetch("/api/bingo", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          initData: initData
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.bingo) {
+
+        winnerBox.classList.remove("hidden");
+
+        winnerName.textContent =
+          data.winnerName || "You";
+
+        winnerCard.textContent =
+          data.winnerCardNumber ||
+          myCardNumberEl.textContent;
+
+        gameStatusEl.textContent = "FINISHED";
+
+        bingoButton.textContent = "🏆 BINGO VALID!";
+
+      } else {
+
+        alert(
+          data.message ||
+          "Bingo is not valid yet."
+        );
+
+        bingoButton.disabled = false;
+        bingoButton.textContent = "🎉 BINGO!";
+      }
+
+    } catch (error) {
+
+      bingoButton.disabled = false;
+      bingoButton.textContent = "🎉 BINGO!";
+    }
+
+  });
+
+
+  async function start() {
+
+    if (!initData) {
+      selectionMessage.textContent =
+        "Please open this game from Telegram.";
+    }
+
+    await loadCards();
+
+    await loadMyCard();
+
+    /*
+     * If the player already has a card in the current game,
+     * show the game directly.
+     */
+    if (myCard) {
+      showGame();
+      await updateGameState();
+    } else {
+      showSelection();
+    }
+
+    /*
+     * Check frequently so a new game is detected quickly.
+     */
+    gamePolling = setInterval(
+      updateGameState,
+      1000
     );
   }
 
 
-  async function toggleNumber(
-    number
-  ) {
+  start();
 
-    if (
-      !calledNumbers.includes(
-        number
-      )
-    ) {
-
-      document.getElementById(
-        "gameMessage"
-      ).textContent =
-        "⏳ Number " +
-        number +
-        " has not been called yet.";
-
-      return;
-    }
-
-    try {
-
-      if (
-        markedNumbers.includes(
-          number
-        )
-      ) {
-
-        const result =
-          await api(
-            "/api/unmark",
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-
-              body:
-                JSON.stringify({
-                  initData:
-                    initData,
-
-                  number:
-                    number
-                })
-            }
-          );
-
-        markedNumbers =
-          result.markedNumbers ||
-          [];
-
-      } else {
-
-        const result =
-          await api(
-            "/api/mark",
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-
-              body:
-                JSON.stringify({
-                  initData:
-                    initData,
-
-                  number:
-                    number
-                })
-            }
-          );
-
-        markedNumbers =
-          result.markedNumbers ||
-          [];
-      }
-
-      renderGameBoard();
-
-      document.getElementById(
-        "gameMessage"
-      ).textContent = "";
-
-    } catch (error) {
-
-      document.getElementById(
-        "gameMessage"
-      ).textContent =
-        "❌ " +
-        error.message;
-    }
-  }
-
-
-  document.getElementById(
-    "bingoButton"
-  ).onclick =
-    async () => {
-
-      try {
-
-        const result =
-          await api(
-            "/api/bingo",
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-
-              body:
-                JSON.stringify({
-                  initData:
-                    initData
-                })
-            }
-          );
-
-        document.getElementById(
-          "gameMessage"
-        ).textContent =
-          result.message;
-
-        if (
-          result.bingo
-        ) {
-
-          document.getElementById(
-            "gameMessage"
-          ).style.fontSize =
-            "22px";
-        }
-
-      } catch (error) {
-
-        document.getElementById(
-          "gameMessage"
-        ).textContent =
-          "❌ " +
-          error.message;
-      }
-    };
-
-
-  document.getElementById(
-    "backButton"
-  ).onclick =
-    () => {
-
-      if (gamePolling) {
-        clearInterval(
-          gamePolling
-        );
-
-        gamePolling = null;
-      }
-
-      document.getElementById(
-        "gameScreen"
-      ).classList.remove(
-        "active"
-      );
-
-      document.getElementById(
-        "selectionScreen"
-      ).classList.add(
-        "active"
-      );
-    };
-
-
-  loadCards();
+})();
 </script>
 
 </body>
