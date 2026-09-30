@@ -13,11 +13,9 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-const BOT_TOKEN =
-  process.env.BOT_TOKEN;
+const BOT_TOKEN = process.env.BOT_TOKEN;
 
-const DATABASE_URL =
-  process.env.DATABASE_URL;
+const DATABASE_URL = process.env.DATABASE_URL;
 
 const MINIAPP_URL =
   process.env.MINIAPP_URL ||
@@ -53,8 +51,7 @@ const pool = new Pool({
    BOT
 ===================================================== */
 
-const bot =
-  new Telegraf(BOT_TOKEN);
+const bot = new Telegraf(BOT_TOKEN);
 
 
 /* =====================================================
@@ -62,11 +59,7 @@ const bot =
 ===================================================== */
 
 app.get("/", (req, res) => {
-
-  res.send(
-    "Telegram Bingo Bot is running."
-  );
-
+  res.send("Telegram Bingo Bot is running.");
 });
 
 
@@ -75,7 +68,6 @@ app.get("/", (req, res) => {
 ===================================================== */
 
 app.get("/miniapp", (req, res) => {
-
   res.sendFile(
     path.join(
       __dirname,
@@ -83,7 +75,6 @@ app.get("/miniapp", (req, res) => {
       "index.html"
     )
   );
-
 });
 
 
@@ -108,8 +99,6 @@ function normalizeBoard(board) {
   }
 
 
-  /* ARRAY FORMAT */
-
   if (Array.isArray(board)) {
 
     if (board.length !== 5) {
@@ -122,9 +111,7 @@ function normalizeBoard(board) {
         !Array.isArray(row) ||
         row.length !== 5
       ) {
-
         return null;
-
       }
 
     }
@@ -133,8 +120,6 @@ function normalizeBoard(board) {
 
   }
 
-
-  /* B I N G O FORMAT */
 
   if (
     typeof board === "object" &&
@@ -154,9 +139,7 @@ function normalizeBoard(board) {
       !Array.isArray(G) ||
       !Array.isArray(O)
     ) {
-
       return null;
-
     }
 
     if (
@@ -166,25 +149,20 @@ function normalizeBoard(board) {
       G.length !== 5 ||
       O.length !== 5
     ) {
-
       return null;
-
     }
 
     return {
-
       B,
       I,
       N,
       G,
       O
-
     };
 
   }
 
   return null;
-
 }
 
 
@@ -197,26 +175,33 @@ function boardToColumns(board) {
     return null;
   }
 
-
-  if (
-    !Array.isArray(normalized)
-  ) {
-
+  if (!Array.isArray(normalized)) {
     return normalized;
-
   }
-
 
   return {
 
-    B: normalized.map(row => row[0]),
-    I: normalized.map(row => row[1]),
-    N: normalized.map(row => row[2]),
-    G: normalized.map(row => row[3]),
-    O: normalized.map(row => row[4])
+    B: normalized.map(
+      row => row[0]
+    ),
+
+    I: normalized.map(
+      row => row[1]
+    ),
+
+    N: normalized.map(
+      row => row[2]
+    ),
+
+    G: normalized.map(
+      row => row[3]
+    ),
+
+    O: normalized.map(
+      row => row[4]
+    )
 
   };
-
 }
 
 
@@ -229,11 +214,9 @@ function boardToRows(board) {
     return null;
   }
 
-
   if (Array.isArray(normalized)) {
     return normalized;
   }
-
 
   return [
 
@@ -278,7 +261,6 @@ function boardToRows(board) {
     ]
 
   ];
-
 }
 
 
@@ -304,7 +286,6 @@ function randomNumbers(
 
   }
 
-
   for (
     let i = numbers.length - 1;
     i > 0;
@@ -326,12 +307,10 @@ function randomNumbers(
 
   }
 
-
   return numbers.slice(
     0,
     count
   );
-
 }
 
 
@@ -372,20 +351,15 @@ function generateBoard() {
       5
     );
 
-
   N[2] = "FREE";
 
-
   return {
-
     B,
     I,
     N,
     G,
     O
-
   };
-
 }
 
 
@@ -407,6 +381,8 @@ async function setupDatabase() {
       user_id BIGINT PRIMARY KEY,
       username TEXT,
       first_name TEXT,
+      phone_number TEXT,
+      phone_shared_at TIMESTAMPTZ,
       card_number INTEGER,
       card_game_id BIGINT,
       marked_numbers JSONB DEFAULT '[]'::jsonb
@@ -423,6 +399,18 @@ async function setupDatabase() {
   await pool.query(`
     ALTER TABLE players
     ADD COLUMN IF NOT EXISTS first_name TEXT
+  `);
+
+
+  await pool.query(`
+    ALTER TABLE players
+    ADD COLUMN IF NOT EXISTS phone_number TEXT
+  `);
+
+
+  await pool.query(`
+    ALTER TABLE players
+    ADD COLUMN IF NOT EXISTS phone_shared_at TIMESTAMPTZ
   `);
 
 
@@ -520,10 +508,8 @@ async function setupDatabase() {
       continue;
     }
 
-
     const board =
       generateBoard();
-
 
     await pool.query(
       `
@@ -602,11 +588,6 @@ async function startNewGame() {
     );
 
 
-    /*
-     * Release ALL card reservations
-     * from previous game.
-     */
-
     await pool.query(`
       UPDATE players
       SET
@@ -652,7 +633,9 @@ async function startNewGame() {
         winner_card_number = NULL
       WHERE id = 1
       `,
-      [nextGameId]
+      [
+        nextGameId
+      ]
     );
 
 
@@ -712,11 +695,6 @@ async function finishGame(
       );
 
 
-    /*
-     * Don't finish an already finished
-     * game again.
-     */
-
     if (
       result.rows[0].status ===
       "finished"
@@ -761,10 +739,6 @@ async function finishGame(
 
     }
 
-
-    /*
-     * Start next game after 5 seconds.
-     */
 
     setTimeout(
       async () => {
@@ -842,14 +816,6 @@ async function callNextNumber() {
       : [];
 
 
-    /*
-     * IMPORTANT FIX:
-     *
-     * If all 75 numbers have already
-     * been called, finish the game
-     * even if nobody won.
-     */
-
     if (
       called.length >= 75
     ) {
@@ -859,12 +825,7 @@ async function callNextNumber() {
       );
 
 
-      await finishGame(
-        null,
-        null,
-        null
-      );
-
+      await finishGame();
 
       return;
 
@@ -895,11 +856,7 @@ async function callNextNumber() {
       available.length === 0
     ) {
 
-      await finishGame(
-        null,
-        null,
-        null
-      );
+      await finishGame();
 
       return;
 
@@ -942,25 +899,16 @@ async function callNextNumber() {
     );
 
 
-    /*
-     * If this was number 75,
-     * immediately finish as no winner.
-     */
-
     if (
       newCalled.length >= 75
     ) {
 
       console.log(
-        `Game ${game.game_id}: number 75 reached. No winner.`
+        `Game ${game.game_id}: all 75 numbers called. No winner.`
       );
 
 
-      await finishGame(
-        null,
-        null,
-        null
-      );
+      await finishGame();
 
     }
 
@@ -975,10 +923,6 @@ async function callNextNumber() {
 
 }
 
-
-/* =====================================================
-   AUTOMATIC CALLER
-===================================================== */
 
 setInterval(
   callNextNumber,
@@ -1094,7 +1038,6 @@ app.get(
                 row.board
               );
 
-
             return {
 
               cardNumber:
@@ -1114,7 +1057,8 @@ app.get(
 
 
       for (
-        const card of cards
+        const card of
+        cards
       ) {
 
         cardsByNumber[
@@ -1395,8 +1339,7 @@ app.post(
         userId,
         cardNumber,
         username,
-        firstName,
-        initData
+        firstName
       } = req.body;
 
 
@@ -1450,9 +1393,11 @@ app.post(
         `);
 
 
-      if (
-        gameResult.rows.length === 0
-      ) {
+      const game =
+        gameResult.rows[0];
+
+
+      if (!game) {
 
         await client.query(
           "ROLLBACK"
@@ -1468,10 +1413,6 @@ app.post(
         });
 
       }
-
-
-      const game =
-        gameResult.rows[0];
 
 
       if (
@@ -1600,7 +1541,6 @@ app.post(
           "ROLLBACK"
         );
 
-
         return res.status(400).json({
 
           success: false,
@@ -1720,7 +1660,6 @@ app.post(
           "ROLLBACK"
         );
       } catch {}
-
 
       console.error(
         "SELECT CARD ERROR:",
@@ -2039,8 +1978,7 @@ app.post(
       const playerResult =
         await pool.query(
           `
-          SELECT
-            marked_numbers
+          SELECT marked_numbers
           FROM players
           WHERE
             user_id = $1
@@ -2348,8 +2286,6 @@ function hasWinningLine(
   }
 
 
-  /* ROWS */
-
   for (
     let row = 0;
     row < 5;
@@ -2387,8 +2323,6 @@ function hasWinningLine(
 
   }
 
-
-  /* COLUMNS */
 
   for (
     let col = 0;
@@ -2428,8 +2362,6 @@ function hasWinningLine(
   }
 
 
-  /* MAIN DIAGONAL */
-
   let diagonal1 = true;
 
 
@@ -2459,8 +2391,6 @@ function hasWinningLine(
     return true;
   }
 
-
-  /* SECOND DIAGONAL */
 
   let diagonal2 = true;
 
@@ -2941,36 +2871,445 @@ app.get(
 
 
 /* =====================================================
-   BOT MENU
+   TELEGRAM COMMAND MENU
 ===================================================== */
 
-const menuKeyboard =
+async function setupBotMenu() {
+
+  try {
+
+    await bot.telegram.setMyCommands([
+
+      {
+        command: "play",
+        description: "🎮 Play Game"
+      },
+
+      {
+        command: "winning_patterns",
+        description: "🏆 Winning Patterns"
+      },
+
+      {
+        command: "instructions",
+        description: "📋 Game Instructions"
+      },
+
+      {
+        command: "balance",
+        description: "💰 Check Balance"
+      },
+
+      {
+        command: "deposit",
+        description: "💵 Deposit"
+      },
+
+      {
+        command: "withdraw",
+        description: "💸 Withdraw"
+      },
+
+      {
+        command: "transactions",
+        description: "📜 My Transactions"
+      },
+
+      {
+        command: "referrals",
+        description: "👥 Referrals"
+      },
+
+      {
+        command: "referral_voucher",
+        description: "🎟️ Referral Voucher"
+      },
+
+      {
+        command: "contact_support",
+        description: "📞 Contact Support"
+      },
+
+      {
+        command: "help",
+        description: "❓ Help"
+      }
+
+    ]);
+
+    console.log(
+      "Telegram command menu configured."
+    );
+
+  } catch (error) {
+
+    console.error(
+      "BOT MENU ERROR:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   CHECK REGISTRATION
+===================================================== */
+
+async function getPlayer(
+  userId
+) {
+
+  const result =
+    await pool.query(
+      `
+      SELECT *
+      FROM players
+      WHERE user_id = $1
+      `,
+      [
+        userId
+      ]
+    );
+
+  return result.rows[0] || null;
+
+}
+
+
+/* =====================================================
+   PHONE REGISTRATION KEYBOARD
+===================================================== */
+
+function phoneKeyboard() {
+
+  return Markup.keyboard([
+
+    [
+      Markup.button.requestContact(
+        "📱 Share My Phone Number"
+      )
+    ]
+
+  ])
+  .oneTime()
+  .resize();
+
+}
+
+
+/* =====================================================
+   MAIN MENU KEYBOARD
+===================================================== */
+
+const mainMenuKeyboard =
   Markup.keyboard([
 
-    ["▶️ Start", "🎮 Play"],
+    [
+      "🎮 Play Game"
+    ],
 
-    ["💰 Deposit", "💳 Balance"],
+    [
+      "🏆 Winning Patterns",
+      "📋 Instructions"
+    ],
 
-    ["💸 Withdraw", "❓ HIW"],
+    [
+      "💰 Balance",
+      "💵 Deposit"
+    ],
 
-    ["🎁 Invite", "🆘 Support"]
+    [
+      "💸 Withdraw",
+      "📜 Transactions"
+    ],
+
+    [
+      "👥 Referrals",
+      "🎟️ Referral Voucher"
+    ],
+
+    [
+      "📞 Support",
+      "❓ Help"
+    ]
 
   ])
   .resize();
 
 
 /* =====================================================
-   BOT START
+   SHOW REGISTRATION
+===================================================== */
+
+async function askForPhone(
+  ctx
+) {
+
+  await ctx.reply(
+
+    "👋 Welcome to Roda Bingo!\n\n" +
+    "Before you can play, please share your phone number to create your account.\n\n" +
+    "🔐 Your number will be saved with your Bingo account.",
+
+    phoneKeyboard()
+
+  );
+
+}
+
+
+/* =====================================================
+   START
 ===================================================== */
 
 bot.start(
   async ctx => {
 
+    try {
+
+      const userId =
+        ctx.from.id;
+
+
+      const player =
+        await getPlayer(
+          userId
+        );
+
+
+      if (
+        !player ||
+        !player.phone_number
+      ) {
+
+        await askForPhone(
+          ctx
+        );
+
+        return;
+
+      }
+
+
+      await ctx.reply(
+
+        "🎱 Welcome back to Roda Bingo!\n\n" +
+        "Choose an option from the menu.",
+
+        mainMenuKeyboard
+
+      );
+
+    } catch (error) {
+
+      console.error(
+        "START ERROR:",
+        error
+      );
+
+      await ctx.reply(
+        "Something went wrong. Please try /start again."
+      );
+
+    }
+
+  }
+);
+
+
+/* =====================================================
+   CONTACT RECEIVED
+===================================================== */
+
+bot.on(
+  "contact",
+  async ctx => {
+
+    try {
+
+      const contact =
+        ctx.message.contact;
+
+
+      const telegramUserId =
+        ctx.from.id;
+
+
+      /*
+       * Only accept the contact if
+       * it belongs to the Telegram user
+       * who pressed the button.
+       */
+
+      if (
+        !contact.user_id ||
+        Number(contact.user_id) !==
+        Number(telegramUserId)
+      ) {
+
+        await ctx.reply(
+
+          "❌ Please use the button to share your own phone number.",
+
+          phoneKeyboard()
+
+        );
+
+        return;
+
+      }
+
+
+      const phoneNumber =
+        contact.phone_number;
+
+
+      const username =
+        ctx.from.username ||
+        null;
+
+
+      const firstName =
+        ctx.from.first_name ||
+        null;
+
+
+      await pool.query(
+        `
+        INSERT INTO players
+        (
+          user_id,
+          username,
+          first_name,
+          phone_number,
+          phone_shared_at,
+          marked_numbers
+        )
+        VALUES
+        (
+          $1,
+          $2,
+          $3,
+          $4,
+          NOW(),
+          '[]'::jsonb
+        )
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+          username = EXCLUDED.username,
+          first_name = EXCLUDED.first_name,
+          phone_number = EXCLUDED.phone_number,
+          phone_shared_at = NOW()
+        `,
+        [
+          telegramUserId,
+          username,
+          firstName,
+          phoneNumber
+        ]
+      );
+
+
+      await ctx.reply(
+        "✅ Phone number registered successfully!\n\n" +
+        "🎱 Welcome to Roda Bingo!\n\n" +
+        "Your Bingo account is now ready.",
+        Markup.removeKeyboard()
+      );
+
+
+      await ctx.reply(
+        "Choose an option from the menu.",
+        mainMenuKeyboard
+      );
+
+
+      console.log(
+        `Registered phone for user ${telegramUserId}`
+      );
+
+    } catch (error) {
+
+      console.error(
+        "CONTACT ERROR:",
+        error
+      );
+
+      await ctx.reply(
+        "❌ I could not save your phone number. Please try again."
+      );
+
+    }
+
+  }
+);
+
+
+/* =====================================================
+   REQUIRE REGISTRATION
+===================================================== */
+
+async function requireRegistration(
+  ctx
+) {
+
+  const player =
+    await getPlayer(
+      ctx.from.id
+    );
+
+
+  if (
+    !player ||
+    !player.phone_number
+  ) {
+
+    await askForPhone(
+      ctx
+    );
+
+    return false;
+
+  }
+
+
+  return true;
+
+}
+
+
+/* =====================================================
+   /PLAY
+===================================================== */
+
+bot.command(
+  "play",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
     await ctx.reply(
 
-      "🎱 Welcome to Roda Bingo!\n\nChoose an option below:",
+      "🎮 Roda Bingo\n\n" +
+      "Choose your Bingo card and enter the game.",
 
-      menuKeyboard
+      Markup.inlineKeyboard([
+
+        [
+          Markup.button.webApp(
+            "🎮 OPEN BINGO",
+            MINIAPP_URL
+          )
+        ]
+
+      ])
 
     );
 
@@ -2979,12 +3318,272 @@ bot.start(
 
 
 /* =====================================================
-   PLAY
+   /WINNING PATTERNS
+===================================================== */
+
+bot.command(
+  "winning_patterns",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+
+      "🏆 Winning Patterns\n\n" +
+      "You can win by completing any full:\n\n" +
+      "➖ Horizontal row\n" +
+      "│ Vertical column\n" +
+      "↘️ Main diagonal\n" +
+      "↙️ Other diagonal\n\n" +
+      "The FREE space in the center counts automatically."
+
+    );
+
+  }
+);
+
+
+/* =====================================================
+   /INSTRUCTIONS
+===================================================== */
+
+bot.command(
+  "instructions",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+
+      "📋 Game Instructions\n\n" +
+      "1️⃣ Choose a Bingo card from 1–100.\n\n" +
+      "2️⃣ Your selected card is reserved for you during the current game.\n\n" +
+      "3️⃣ Numbers are called automatically every few seconds.\n\n" +
+      "4️⃣ Mark the numbers that have been called on your card.\n\n" +
+      "5️⃣ When you complete a winning pattern, press BINGO.\n\n" +
+      "6️⃣ If your Bingo is valid, the game ends and you become the winner.\n\n" +
+      "🎱 A new game starts automatically."
+
+    );
+
+  }
+);
+
+
+/* =====================================================
+   /BALANCE
+===================================================== */
+
+bot.command(
+  "balance",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "💰 Balance\n\nBalance system is not connected yet."
+    );
+
+  }
+);
+
+
+/* =====================================================
+   /DEPOSIT
+===================================================== */
+
+bot.command(
+  "deposit",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "💵 Deposit\n\nDeposit system is not connected yet."
+    );
+
+  }
+);
+
+
+/* =====================================================
+   /WITHDRAW
+===================================================== */
+
+bot.command(
+  "withdraw",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "💸 Withdraw\n\nWithdraw system is not connected yet."
+    );
+
+  }
+);
+
+
+/* =====================================================
+   /TRANSACTIONS
+===================================================== */
+
+bot.command(
+  "transactions",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "📜 My Transactions\n\nTransaction history is not connected yet."
+    );
+
+  }
+);
+
+
+/* =====================================================
+   /REFERRALS
+===================================================== */
+
+bot.command(
+  "referrals",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "👥 Referrals\n\nReferral system is not connected yet."
+    );
+
+  }
+);
+
+
+/* =====================================================
+   /REFERRAL VOUCHER
+===================================================== */
+
+bot.command(
+  "referral_voucher",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "🎟️ Referral Voucher\n\nReferral voucher system is not connected yet."
+    );
+
+  }
+);
+
+
+/* =====================================================
+   /CONTACT SUPPORT
+===================================================== */
+
+bot.command(
+  "contact_support",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "📞 Contact Support\n\nSupport system is not connected yet."
+    );
+
+  }
+);
+
+
+/* =====================================================
+   /HELP
+===================================================== */
+
+bot.command(
+  "help",
+  async ctx => {
+
+    await ctx.reply(
+
+      "❓ Help\n\n" +
+      "Use the Telegram Menu to access the Bingo features.\n\n" +
+      "🎮 Play Game — enter Bingo\n" +
+      "🏆 Winning Patterns — see winning patterns\n" +
+      "📋 Instructions — learn how to play\n" +
+      "💰 Balance — check your balance\n" +
+      "💵 Deposit — deposit funds\n" +
+      "💸 Withdraw — request withdrawal\n" +
+      "📜 Transactions — view transactions\n" +
+      "👥 Referrals — referral information\n" +
+      "🎟️ Referral Voucher — referral voucher\n" +
+      "📞 Contact Support — contact support"
+
+    );
+
+  }
+);
+
+
+/* =====================================================
+   CUSTOM KEYBOARD BUTTONS
 ===================================================== */
 
 bot.hears(
-  "🎮 Play",
+  "🎮 Play Game",
   async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
 
     await ctx.reply(
 
@@ -3007,33 +3606,19 @@ bot.hears(
 );
 
 
-/* =====================================================
-   START MENU
-===================================================== */
-
 bot.hears(
-  "▶️ Start",
+  "🏆 Winning Patterns",
   async ctx => {
 
-    await ctx.reply(
-      "🎱 Welcome to Roda Bingo!\n\nChoose an option below:",
-      menuKeyboard
-    );
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
 
-  }
-);
-
-
-/* =====================================================
-   PLACEHOLDER BUTTONS
-===================================================== */
-
-bot.hears(
-  "💰 Deposit",
-  async ctx => {
 
     await ctx.reply(
-      "Deposit system is not connected yet."
+      "🏆 Complete any horizontal row, vertical column, or diagonal. The center FREE space counts automatically."
     );
 
   }
@@ -3041,11 +3626,56 @@ bot.hears(
 
 
 bot.hears(
-  "💳 Balance",
+  "📋 Instructions",
   async ctx => {
 
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
     await ctx.reply(
-      "Balance system is not connected yet."
+      "📋 Choose a card → numbers are called → mark called numbers → press BINGO when you have a winning line."
+    );
+
+  }
+);
+
+
+bot.hears(
+  "💰 Balance",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "💰 Balance system is not connected yet."
+    );
+
+  }
+);
+
+
+bot.hears(
+  "💵 Deposit",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "💵 Deposit system is not connected yet."
     );
 
   }
@@ -3056,8 +3686,15 @@ bot.hears(
   "💸 Withdraw",
   async ctx => {
 
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
     await ctx.reply(
-      "Withdraw system is not connected yet."
+      "💸 Withdraw system is not connected yet."
     );
 
   }
@@ -3065,11 +3702,18 @@ bot.hears(
 
 
 bot.hears(
-  "❓ HIW",
+  "📜 Transactions",
   async ctx => {
 
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
     await ctx.reply(
-      "How to Play:\n\n1. Choose a card from 1–100.\n2. Wait for numbers to be called.\n3. Mark called numbers on your card.\n4. Press BINGO when you complete a winning line."
+      "📜 Transaction history is not connected yet."
     );
 
   }
@@ -3077,11 +3721,18 @@ bot.hears(
 
 
 bot.hears(
-  "🎁 Invite",
+  "👥 Referrals",
   async ctx => {
 
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
     await ctx.reply(
-      "Invite system is not connected yet."
+      "👥 Referral system is not connected yet."
     );
 
   }
@@ -3089,11 +3740,49 @@ bot.hears(
 
 
 bot.hears(
-  "🆘 Support",
+  "🎟️ Referral Voucher",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "🎟️ Referral voucher system is not connected yet."
+    );
+
+  }
+);
+
+
+bot.hears(
+  "📞 Support",
+  async ctx => {
+
+    if (
+      !(await requireRegistration(ctx))
+    ) {
+      return;
+    }
+
+
+    await ctx.reply(
+      "📞 Support system is not connected yet."
+    );
+
+  }
+);
+
+
+bot.hears(
+  "❓ Help",
   async ctx => {
 
     await ctx.reply(
-      "Support system is not connected yet."
+      "❓ Use the Telegram Menu to access all Bingo features."
     );
 
   }
@@ -3140,6 +3829,8 @@ async function startServer() {
   try {
 
     await setupDatabase();
+
+    await setupBotMenu();
 
 
     app.listen(
