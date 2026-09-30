@@ -10,13 +10,6 @@ const PORT = process.env.PORT || 10000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const DATABASE_URL = process.env.DATABASE_URL;
 
-// ============================================================
-// MINI APP URL
-// ============================================================
-// No MINIAPP_URL environment variable is required.
-// You can still set MINIAPP_URL in Render later if you want.
-// ============================================================
-
 const MINIAPP_URL =
   process.env.MINIAPP_URL ||
   "https://telegram-bingo-bot-q54q.onrender.com/miniapp";
@@ -62,10 +55,11 @@ function sendJson(res, data, status = 200) {
   res.end(JSON.stringify(data));
 }
 
-// Converts either:
+// ============================================================
+// NORMALIZE BOARD
+// Supports:
 // 1. 5x5 array
 // 2. {B:[], I:[], N:[], G:[], O:[]}
-// into a 5x5 array.
 // ============================================================
 
 function normalizeBoard(board) {
@@ -79,7 +73,7 @@ function normalizeBoard(board) {
     }
   }
 
-  // Already a 5x5 array
+  // Already 5x5 array
   if (Array.isArray(value)) {
     if (value.length !== 5) {
       return null;
@@ -88,7 +82,10 @@ function normalizeBoard(board) {
     const normalized = [];
 
     for (let r = 0; r < 5; r++) {
-      if (!Array.isArray(value[r]) || value[r].length !== 5) {
+      if (
+        !Array.isArray(value[r]) ||
+        value[r].length !== 5
+      ) {
         return null;
       }
 
@@ -116,9 +113,7 @@ function normalizeBoard(board) {
     return normalized;
   }
 
-  // Column object:
-  // { B:[...], I:[...], N:[...], G:[...], O:[...] }
-
+  // Column object
   if (
     value &&
     typeof value === "object" &&
@@ -176,6 +171,10 @@ function normalizeBoard(board) {
   return null;
 }
 
+// ============================================================
+// BINGO BOARD GENERATION
+// ============================================================
+
 function generateColumnNumbers(min, max) {
   const numbers = [];
 
@@ -190,7 +189,8 @@ function shuffle(array) {
   const arr = [...array];
 
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j =
+      Math.floor(Math.random() * (i + 1));
 
     const temp = arr[i];
     arr[i] = arr[j];
@@ -277,6 +277,10 @@ function boardIsValid(board) {
 async function setupDatabase() {
   console.log("Setting up database...");
 
+  // ----------------------------------------------------------
+  // PLAYERS
+  // ----------------------------------------------------------
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS players (
       user_id BIGINT PRIMARY KEY,
@@ -286,6 +290,19 @@ async function setupDatabase() {
       card_game_id BIGINT,
       marked_numbers JSONB DEFAULT '[]'::jsonb
     )
+  `);
+
+  // IMPORTANT:
+  // These ALTER statements fix old databases that were created
+  // before username / first_name existed.
+  await pool.query(`
+    ALTER TABLE players
+    ADD COLUMN IF NOT EXISTS username TEXT
+  `);
+
+  await pool.query(`
+    ALTER TABLE players
+    ADD COLUMN IF NOT EXISTS first_name TEXT
   `);
 
   await pool.query(`
@@ -300,8 +317,18 @@ async function setupDatabase() {
 
   await pool.query(`
     ALTER TABLE players
-    ADD COLUMN IF NOT EXISTS marked_numbers JSONB DEFAULT '[]'::jsonb
+    ADD COLUMN IF NOT EXISTS marked_numbers JSONB
   `);
+
+  await pool.query(`
+    UPDATE players
+    SET marked_numbers = '[]'::jsonb
+    WHERE marked_numbers IS NULL
+  `);
+
+  // ----------------------------------------------------------
+  // PERMANENT BINGO CARDS
+  // ----------------------------------------------------------
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS bingo_cards (
@@ -309,6 +336,10 @@ async function setupDatabase() {
       board JSONB NOT NULL
     )
   `);
+
+  // ----------------------------------------------------------
+  // GAME STATE
+  // ----------------------------------------------------------
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS game_state (
@@ -324,10 +355,23 @@ async function setupDatabase() {
 
   await pool.query(`
     ALTER TABLE game_state
+    ADD COLUMN IF NOT EXISTS winner_user_id BIGINT
+  `);
+
+  await pool.query(`
+    ALTER TABLE game_state
+    ADD COLUMN IF NOT EXISTS winner_name TEXT
+  `);
+
+  await pool.query(`
+    ALTER TABLE game_state
     ADD COLUMN IF NOT EXISTS winner_card_number INTEGER
   `);
 
-  // Remove stale reservations.
+  // ----------------------------------------------------------
+  // REMOVE OLD/STale CARD RESERVATIONS
+  // ----------------------------------------------------------
+
   await pool.query(`
     UPDATE players
     SET
@@ -337,24 +381,39 @@ async function setupDatabase() {
     WHERE card_game_id IS NULL
   `);
 
-  // Create permanent cards 1-100.
-  for (let cardNumber = 1; cardNumber <= 100; cardNumber++) {
-    const existing = await pool.query(
-      `
-      SELECT board
-      FROM bingo_cards
-      WHERE card_number = $1
-      `,
-      [cardNumber]
-    );
+  // ----------------------------------------------------------
+  // CREATE PERMANENT CARDS 1-100
+  // ----------------------------------------------------------
+
+  for (
+    let cardNumber = 1;
+    cardNumber <= 100;
+    cardNumber++
+  ) {
+    const existing =
+      await pool.query(
+        `
+        SELECT board
+        FROM bingo_cards
+        WHERE card_number = $1
+        `,
+        [cardNumber]
+      );
 
     if (existing.rows.length === 0) {
-      const board = generateBingoBoard();
+      const board =
+        generateBingoBoard();
 
       await pool.query(
         `
-        INSERT INTO bingo_cards(card_number, board)
-        VALUES($1, $2::jsonb)
+        INSERT INTO bingo_cards(
+          card_number,
+          board
+        )
+        VALUES(
+          $1,
+          $2::jsonb
+        )
         `,
         [
           cardNumber,
@@ -366,9 +425,10 @@ async function setupDatabase() {
         `Created permanent Bingo card #${cardNumber}`
       );
     } else {
-      const board = normalizeBoard(
-        existing.rows[0].board
-      );
+      const board =
+        normalizeBoard(
+          existing.rows[0].board
+        );
 
       if (!boardIsValid(board)) {
         console.error(
@@ -378,11 +438,16 @@ async function setupDatabase() {
     }
   }
 
-  const game = await pool.query(`
-    SELECT *
-    FROM game_state
-    WHERE id = 1
-  `);
+  // ----------------------------------------------------------
+  // CREATE FIRST GAME IF NEEDED
+  // ----------------------------------------------------------
+
+  const game =
+    await pool.query(`
+      SELECT *
+      FROM game_state
+      WHERE id = 1
+    `);
 
   if (game.rows.length === 0) {
     await pool.query(`
@@ -406,15 +471,22 @@ async function setupDatabase() {
       )
     `);
 
-    console.log("Created first Bingo game.");
+    console.log(
+      "Created first Bingo game."
+    );
   }
+
+  // ----------------------------------------------------------
+  // UNIQUE CURRENT CARD RESERVATION
+  // ----------------------------------------------------------
 
   await pool.query(`
     DROP INDEX IF EXISTS players_card_number_unique
   `);
 
   await pool.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS players_card_number_unique
+    CREATE UNIQUE INDEX IF NOT EXISTS
+    players_card_number_unique
     ON players(card_number)
     WHERE card_number IS NOT NULL
   `);
@@ -427,11 +499,12 @@ async function setupDatabase() {
 // ============================================================
 
 async function getGame() {
-  const result = await pool.query(`
-    SELECT *
-    FROM game_state
-    WHERE id = 1
-  `);
+  const result =
+    await pool.query(`
+      SELECT *
+      FROM game_state
+      WHERE id = 1
+    `);
 
   if (result.rows.length === 0) {
     return null;
@@ -446,16 +519,17 @@ async function startNewGame() {
   startingNewGame = true;
 
   try {
-    const current = await getGame();
+    const current =
+      await getGame();
 
     if (!current) {
-      startingNewGame = false;
       return;
     }
 
     const nextGameId =
       Number(current.game_id) + 1;
 
+    // Release all card numbers
     await pool.query(`
       UPDATE players
       SET
@@ -498,7 +572,8 @@ async function finishGame(
   winnerCardNumber
 ) {
   try {
-    const game = await getGame();
+    const game =
+      await getGame();
 
     if (
       !game ||
@@ -528,9 +603,12 @@ async function finishGame(
       `Game ${game.game_id} finished. Winner: ${winnerName} - Card #${winnerCardNumber}`
     );
 
-    setTimeout(async () => {
-      await startNewGame();
-    }, NEW_GAME_DELAY);
+    setTimeout(
+      async () => {
+        await startNewGame();
+      },
+      NEW_GAME_DELAY
+    );
   } catch (error) {
     console.error(
       "finishGame error:",
@@ -545,7 +623,8 @@ async function finishGame(
 
 async function callNextNumber() {
   try {
-    const game = await getGame();
+    const game =
+      await getGame();
 
     if (!game) return;
 
@@ -583,12 +662,15 @@ async function callNextNumber() {
       }
     }
 
-    if (available.length === 0) return;
+    if (available.length === 0) {
+      return;
+    }
 
     const next =
       available[
         Math.floor(
-          Math.random() * available.length
+          Math.random() *
+            available.length
         )
       ];
 
@@ -619,18 +701,30 @@ function startCaller() {
     clearInterval(callerTimer);
   }
 
-  callerTimer = setInterval(
-    async () => {
-      const game = await getGame();
+  callerTimer =
+    setInterval(
+      async () => {
+        try {
+          const game =
+            await getGame();
 
-      if (!game) return;
+          if (!game) return;
 
-      if (game.status === "playing") {
-        await callNextNumber();
-      }
-    },
-    CALL_INTERVAL
-  );
+          if (
+            game.status ===
+            "playing"
+          ) {
+            await callNextNumber();
+          }
+        } catch (error) {
+          console.error(
+            "Caller timer error:",
+            error
+          );
+        }
+      },
+      CALL_INTERVAL
+    );
 
   console.log(
     `Automatic caller started: every ${CALL_INTERVAL} ms`
@@ -642,11 +736,14 @@ function startCaller() {
 // ============================================================
 
 async function getAllCards() {
-  const result = await pool.query(`
-    SELECT card_number, board
-    FROM bingo_cards
-    ORDER BY card_number ASC
-  `);
+  const result =
+    await pool.query(`
+      SELECT
+        card_number,
+        board
+      FROM bingo_cards
+      ORDER BY card_number ASC
+    `);
 
   const cardsObject = {};
   const cardsArray = [];
@@ -682,7 +779,7 @@ async function getAllCards() {
 }
 
 // ============================================================
-// MINI APP PAGE
+// MAIN PAGE
 // ============================================================
 
 app.get("/", (req, res) => {
@@ -691,277 +788,341 @@ app.get("/", (req, res) => {
   );
 });
 
-app.get("/miniapp", (req, res) => {
-  res.sendFile(
-    __dirname + "/miniapp/index.html"
-  );
-});
-
 // ============================================================
-// API CARDS
+// MINI APP
 // ============================================================
 
-app.get("/api/cards", async (req, res) => {
-  try {
-    const game = await getGame();
+app.get(
+  "/miniapp",
+  (req, res) => {
+    res.sendFile(
+      __dirname +
+        "/miniapp/index.html"
+    );
+  }
+);
 
-    if (!game) {
+// ============================================================
+// API: ALL CARDS
+// ============================================================
+
+app.get(
+  "/api/cards",
+  async (req, res) => {
+    try {
+      const game =
+        await getGame();
+
+      if (!game) {
+        return sendJson(
+          res,
+          {
+            success: false,
+            error:
+              "Game not found."
+          },
+          500
+        );
+      }
+
+      const allCards =
+        await getAllCards();
+
+      // IMPORTANT:
+      // username and first_name now exist
+      // because setupDatabase() creates them
+      // if the old table was missing them.
+
+      const usedResult =
+        await pool.query(
+          `
+          SELECT
+            p.card_number,
+            p.user_id,
+            p.username,
+            p.first_name
+          FROM players p
+          WHERE
+            p.card_number IS NOT NULL
+            AND p.card_game_id = $1
+          ORDER BY p.card_number
+          `,
+          [game.game_id]
+        );
+
+      const usedCards = [];
+      const usedBy = {};
+
+      for (
+        const row of usedResult.rows
+      ) {
+        const cardNumber =
+          Number(row.card_number);
+
+        usedCards.push(cardNumber);
+
+        usedBy[
+          String(cardNumber)
+        ] = {
+          userId:
+            String(row.user_id),
+          username:
+            row.username || "",
+          firstName:
+            row.first_name || ""
+        };
+      }
+
+      let calledNumbers =
+        game.called_numbers || [];
+
+      if (
+        typeof calledNumbers ===
+        "string"
+      ) {
+        try {
+          calledNumbers =
+            JSON.parse(
+              calledNumbers
+            );
+        } catch {
+          calledNumbers = [];
+        }
+      }
+
+      if (
+        !Array.isArray(
+          calledNumbers
+        )
+      ) {
+        calledNumbers = [];
+      }
+
+      return sendJson(
+        res,
+        {
+          success: true,
+
+          cards:
+            allCards.array,
+
+          cardsByNumber:
+            allCards.object,
+
+          usedCards,
+
+          usedBy,
+
+          gameId:
+            Number(game.game_id),
+
+          status:
+            game.status,
+
+          calledNumbers,
+
+          winner:
+            game.status ===
+            "finished"
+              ? {
+                  userId:
+                    game.winner_user_id
+                      ? String(
+                          game.winner_user_id
+                        )
+                      : null,
+
+                  name:
+                    game.winner_name ||
+                    null,
+
+                  cardNumber:
+                    game.winner_card_number
+                      ? Number(
+                          game.winner_card_number
+                        )
+                      : null
+                }
+              : null
+        }
+      );
+    } catch (error) {
+      console.error(
+        "/api/cards error:",
+        error
+      );
+
       return sendJson(
         res,
         {
           success: false,
-          error: "Game not found."
+          error:
+            "Could not load cards.",
+          details:
+            error.message
         },
         500
       );
     }
-
-    const allCards =
-      await getAllCards();
-
-    const usedResult =
-      await pool.query(
-        `
-        SELECT
-          p.card_number,
-          p.user_id,
-          p.username,
-          p.first_name
-        FROM players p
-        WHERE p.card_number IS NOT NULL
-          AND p.card_game_id = $1
-        ORDER BY p.card_number
-        `,
-        [game.game_id]
-      );
-
-    const usedCards = [];
-    const usedBy = {};
-
-    for (const row of usedResult.rows) {
-      const cardNumber =
-        Number(row.card_number);
-
-      usedCards.push(cardNumber);
-
-      usedBy[
-        String(cardNumber)
-      ] = {
-        userId:
-          String(row.user_id),
-        username:
-          row.username || "",
-        firstName:
-          row.first_name || ""
-      };
-    }
-
-    return sendJson(
-      res,
-      {
-        success: true,
-
-        cards: allCards.array,
-
-        cardsByNumber:
-          allCards.object,
-
-        usedCards,
-
-        usedBy,
-
-        gameId:
-          Number(game.game_id),
-
-        status:
-          game.status,
-
-        calledNumbers:
-          game.called_numbers || [],
-
-        winner:
-          game.status === "finished"
-            ? {
-                userId:
-                  game.winner_user_id
-                    ? String(
-                        game.winner_user_id
-                      )
-                    : null,
-                name:
-                  game.winner_name ||
-                  null,
-                cardNumber:
-                  game.winner_card_number ||
-                  null
-              }
-            : null
-      }
-    );
-  } catch (error) {
-    console.error(
-      "/api/cards error:",
-      error
-    );
-
-    return sendJson(
-      res,
-      {
-        success: false,
-        error:
-          "Could not load cards.",
-        details:
-          error.message
-      },
-      500
-    );
   }
-});
+);
 
 // ============================================================
-// DIRECT SINGLE CARD
+// API: SINGLE CARD
 // Example:
 // /api/card?number=32
 // ============================================================
 
-app.get("/api/card", async (req, res) => {
-  try {
-    const number =
-      Number(req.query.number);
+app.get(
+  "/api/card",
+  async (req, res) => {
+    try {
+      const number =
+        Number(req.query.number);
 
-    if (
-      !Number.isInteger(number) ||
-      number < 1 ||
-      number > 100
-    ) {
+      if (
+        !Number.isInteger(number) ||
+        number < 1 ||
+        number > 100
+      ) {
+        return sendJson(
+          res,
+          {
+            success: false,
+            error:
+              "Card number must be between 1 and 100."
+          },
+          400
+        );
+      }
+
+      const result =
+        await pool.query(
+          `
+          SELECT
+            card_number,
+            board
+          FROM bingo_cards
+          WHERE card_number = $1
+          `,
+          [number]
+        );
+
+      if (
+        result.rows.length === 0
+      ) {
+        return sendJson(
+          res,
+          {
+            success: false,
+            error:
+              `Card #${number} does not exist.`
+          },
+          404
+        );
+      }
+
+      const board =
+        normalizeBoard(
+          result.rows[0].board
+        );
+
+      if (
+        !board ||
+        !boardIsValid(board)
+      ) {
+        return sendJson(
+          res,
+          {
+            success: false,
+            error:
+              `Card #${number} board is invalid in database.`
+          },
+          500
+        );
+      }
+
+      const game =
+        await getGame();
+
+      const owner =
+        await pool.query(
+          `
+          SELECT
+            user_id,
+            username,
+            first_name
+          FROM players
+          WHERE
+            card_number = $1
+            AND card_game_id = $2
+          LIMIT 1
+          `,
+          [
+            number,
+            game.game_id
+          ]
+        );
+
+      return sendJson(
+        res,
+        {
+          success: true,
+
+          cardNumber: number,
+
+          board,
+
+          gameId:
+            Number(game.game_id),
+
+          status:
+            game.status,
+
+          available:
+            owner.rows.length ===
+            0,
+
+          takenBy:
+            owner.rows.length > 0
+              ? {
+                  userId:
+                    String(
+                      owner.rows[0]
+                        .user_id
+                    ),
+                  username:
+                    owner.rows[0]
+                      .username ||
+                    "",
+                  firstName:
+                    owner.rows[0]
+                      .first_name ||
+                    ""
+                }
+              : null
+        }
+      );
+    } catch (error) {
+      console.error(
+        "/api/card error:",
+        error
+      );
+
       return sendJson(
         res,
         {
           success: false,
           error:
-            "Card number must be between 1 and 100."
-        },
-        400
-      );
-    }
-
-    const result =
-      await pool.query(
-        `
-        SELECT card_number, board
-        FROM bingo_cards
-        WHERE card_number = $1
-        `,
-        [number]
-      );
-
-    if (result.rows.length === 0) {
-      return sendJson(
-        res,
-        {
-          success: false,
-          error:
-            `Card #${number} does not exist.`
-        },
-        404
-      );
-    }
-
-    const board =
-      normalizeBoard(
-        result.rows[0].board
-      );
-
-    if (
-      !board ||
-      !boardIsValid(board)
-    ) {
-      return sendJson(
-        res,
-        {
-          success: false,
-          error:
-            `Card #${number} board is invalid in database.`
+            "Could not load Bingo card.",
+          details:
+            error.message
         },
         500
       );
     }
-
-    const game =
-      await getGame();
-
-    const owner =
-      await pool.query(
-        `
-        SELECT
-          user_id,
-          username,
-          first_name
-        FROM players
-        WHERE card_number = $1
-          AND card_game_id = $2
-        LIMIT 1
-        `,
-        [
-          number,
-          game.game_id
-        ]
-      );
-
-    return sendJson(
-      res,
-      {
-        success: true,
-
-        cardNumber: number,
-
-        board,
-
-        gameId:
-          Number(game.game_id),
-
-        status:
-          game.status,
-
-        available:
-          owner.rows.length === 0,
-
-        takenBy:
-          owner.rows.length > 0
-            ? {
-                userId:
-                  String(
-                    owner.rows[0].user_id
-                  ),
-                username:
-                  owner.rows[0].username ||
-                  "",
-                firstName:
-                  owner.rows[0].first_name ||
-                  ""
-              }
-            : null
-      }
-    );
-  } catch (error) {
-    console.error(
-      "/api/card error:",
-      error
-    );
-
-    return sendJson(
-      res,
-      {
-        success: false,
-        error:
-          "Could not load Bingo card.",
-        details:
-          error.message
-      },
-      500
-    );
   }
-});
+);
 
 // ============================================================
 // SAVE PLAYER
@@ -1074,7 +1235,9 @@ app.post(
       const cardResult =
         await pool.query(
           `
-          SELECT card_number, board
+          SELECT
+            card_number,
+            board
           FROM bingo_cards
           WHERE card_number = $1
           `,
@@ -1082,7 +1245,8 @@ app.post(
         );
 
       if (
-        cardResult.rows.length === 0
+        cardResult.rows.length ===
+        0
       ) {
         return sendJson(
           res,
@@ -1128,8 +1292,10 @@ app.post(
         );
 
       if (
-        existingPlayer.rows.length > 0 &&
-        existingPlayer.rows[0].card_number &&
+        existingPlayer.rows.length >
+          0 &&
+        existingPlayer.rows[0]
+          .card_number &&
         Number(
           existingPlayer.rows[0]
             .card_game_id
@@ -1152,7 +1318,9 @@ app.post(
                 number,
               board,
               gameId:
-                Number(game.game_id)
+                Number(
+                  game.game_id
+                )
             }
           );
         }
@@ -1176,7 +1344,8 @@ app.post(
             username,
             first_name
           FROM players
-          WHERE card_number = $1
+          WHERE
+            card_number = $1
             AND card_game_id = $2
           LIMIT 1
           `,
@@ -1186,7 +1355,9 @@ app.post(
           ]
         );
 
-      if (owner.rows.length > 0) {
+      if (
+        owner.rows.length > 0
+      ) {
         return sendJson(
           res,
           {
@@ -1215,7 +1386,10 @@ app.post(
           ]
         );
       } catch (error) {
-        if (error.code === "23505") {
+        if (
+          error.code ===
+          "23505"
+        ) {
           return sendJson(
             res,
             {
@@ -1242,7 +1416,9 @@ app.post(
             number,
           board,
           gameId:
-            Number(game.game_id),
+            Number(
+              game.game_id
+            ),
           message:
             "Card selected successfully."
         }
@@ -1326,7 +1502,9 @@ app.get(
             success: true,
             hasCard: false,
             gameId:
-              Number(game.game_id)
+              Number(
+                game.game_id
+              )
           }
         );
       }
@@ -1335,7 +1513,9 @@ app.get(
         result.rows[0];
 
       const board =
-        normalizeBoard(row.board);
+        normalizeBoard(
+          row.board
+        );
 
       if (
         !board ||
@@ -1378,6 +1558,32 @@ app.get(
         markedNumbers = [];
       }
 
+      let calledNumbers =
+        game.called_numbers ||
+        [];
+
+      if (
+        typeof calledNumbers ===
+        "string"
+      ) {
+        try {
+          calledNumbers =
+            JSON.parse(
+              calledNumbers
+            );
+        } catch {
+          calledNumbers = [];
+        }
+      }
+
+      if (
+        !Array.isArray(
+          calledNumbers
+        )
+      ) {
+        calledNumbers = [];
+      }
+
       return sendJson(
         res,
         {
@@ -1390,12 +1596,12 @@ app.get(
           board,
           markedNumbers,
           gameId:
-            Number(game.game_id),
+            Number(
+              game.game_id
+            ),
           status:
             game.status,
-          calledNumbers:
-            game.called_numbers ||
-            []
+          calledNumbers
         }
       );
     } catch (error) {
@@ -1420,7 +1626,7 @@ app.get(
 );
 
 // ============================================================
-// MARK
+// MARK NUMBER
 // ============================================================
 
 app.post(
@@ -1437,7 +1643,8 @@ app.post(
 
       if (
         !game ||
-        game.status !== "playing"
+        game.status !==
+          "playing"
       ) {
         return sendJson(
           res,
@@ -1465,9 +1672,11 @@ app.post(
 
       if (
         player.rows.length === 0 ||
-        !player.rows[0].card_number ||
+        !player.rows[0]
+          .card_number ||
         Number(
-          player.rows[0].card_game_id
+          player.rows[0]
+            .card_game_id
         ) !==
           Number(game.game_id)
       ) {
@@ -1482,11 +1691,32 @@ app.post(
         );
       }
 
-      const n = Number(number);
+      const n =
+        Number(number);
 
-      const called =
+      let called =
         game.called_numbers ||
         [];
+
+      if (
+        typeof called ===
+        "string"
+      ) {
+        try {
+          called =
+            JSON.parse(
+              called
+            );
+        } catch {
+          called = [];
+        }
+      }
+
+      if (
+        !Array.isArray(called)
+      ) {
+        called = [];
+      }
 
       if (!called.includes(n)) {
         return sendJson(
@@ -1511,7 +1741,9 @@ app.post(
       ) {
         try {
           marked =
-            JSON.parse(marked);
+            JSON.parse(
+              marked
+            );
         } catch {
           marked = [];
         }
@@ -1558,7 +1790,9 @@ app.post(
         {
           success: false,
           error:
-            "Could not mark number."
+            "Could not mark number.",
+          details:
+            error.message
         },
         500
       );
@@ -1567,7 +1801,7 @@ app.post(
 );
 
 // ============================================================
-// UNMARK
+// UNMARK NUMBER
 // ============================================================
 
 app.post(
@@ -1579,10 +1813,27 @@ app.post(
         number
       } = req.body;
 
+      const game =
+        await getGame();
+
+      if (!game) {
+        return sendJson(
+          res,
+          {
+            success: false,
+            error:
+              "Game not found."
+          },
+          500
+        );
+      }
+
       const player =
         await pool.query(
           `
-          SELECT marked_numbers
+          SELECT
+            marked_numbers,
+            card_game_id
           FROM players
           WHERE user_id = $1
           `,
@@ -1590,7 +1841,8 @@ app.post(
         );
 
       if (
-        player.rows.length === 0
+        player.rows.length ===
+        0
       ) {
         return sendJson(
           res,
@@ -1600,6 +1852,24 @@ app.post(
               "Player not found."
           },
           404
+        );
+      }
+
+      if (
+        Number(
+          player.rows[0]
+            .card_game_id
+        ) !==
+        Number(game.game_id)
+      ) {
+        return sendJson(
+          res,
+          {
+            success: false,
+            error:
+              "This card is not from the current game."
+          },
+          400
         );
       }
 
@@ -1614,10 +1884,18 @@ app.post(
       ) {
         try {
           marked =
-            JSON.parse(marked);
+            JSON.parse(
+              marked
+            );
         } catch {
           marked = [];
         }
+      }
+
+      if (
+        !Array.isArray(marked)
+      ) {
+        marked = [];
       }
 
       marked =
@@ -1658,7 +1936,9 @@ app.post(
         {
           success: false,
           error:
-            "Could not unmark number."
+            "Could not unmark number.",
+          details:
+            error.message
         },
         500
       );
@@ -1667,7 +1947,7 @@ app.post(
 );
 
 // ============================================================
-// BINGO VALIDATION
+// WINNING LINE CHECK
 // ============================================================
 
 function hasWinningLine(
@@ -1699,9 +1979,7 @@ function hasWinningLine(
     let win = true;
 
     for (let c = 0; c < 5; c++) {
-      if (
-        !isMarked(r, c)
-      ) {
+      if (!isMarked(r, c)) {
         win = false;
         break;
       }
@@ -1715,9 +1993,7 @@ function hasWinningLine(
     let win = true;
 
     for (let r = 0; r < 5; r++) {
-      if (
-        !isMarked(r, c)
-      ) {
+      if (!isMarked(r, c)) {
         win = false;
         break;
       }
@@ -1730,9 +2006,7 @@ function hasWinningLine(
   let diagonal1 = true;
 
   for (let i = 0; i < 5; i++) {
-    if (
-      !isMarked(i, i)
-    ) {
+    if (!isMarked(i, i)) {
       diagonal1 = false;
       break;
     }
@@ -1831,10 +2105,13 @@ app.post(
         );
 
       if (
-        player.rows.length === 0 ||
-        !player.rows[0].card_number ||
+        player.rows.length ===
+          0 ||
+        !player.rows[0]
+          .card_number ||
         Number(
-          player.rows[0].card_game_id
+          player.rows[0]
+            .card_game_id
         ) !==
           Number(game.game_id)
       ) {
@@ -1900,9 +2177,31 @@ app.post(
         markedNumbers = [];
       }
 
-      const calledNumbers =
+      let calledNumbers =
         game.called_numbers ||
         [];
+
+      if (
+        typeof calledNumbers ===
+        "string"
+      ) {
+        try {
+          calledNumbers =
+            JSON.parse(
+              calledNumbers
+            );
+        } catch {
+          calledNumbers = [];
+        }
+      }
+
+      if (
+        !Array.isArray(
+          calledNumbers
+        )
+      ) {
+        calledNumbers = [];
+      }
 
       const invalidMarked =
         markedNumbers.some(
@@ -1965,7 +2264,9 @@ app.post(
           winnerName,
           winnerCardNumber,
           gameId:
-            Number(game.game_id),
+            Number(
+              game.game_id
+            ),
           message:
             "BINGO! Your winning card is valid."
         }
@@ -2015,20 +2316,46 @@ app.get(
         );
       }
 
+      let calledNumbers =
+        game.called_numbers ||
+        [];
+
+      if (
+        typeof calledNumbers ===
+        "string"
+      ) {
+        try {
+          calledNumbers =
+            JSON.parse(
+              calledNumbers
+            );
+        } catch {
+          calledNumbers = [];
+        }
+      }
+
+      if (
+        !Array.isArray(
+          calledNumbers
+        )
+      ) {
+        calledNumbers = [];
+      }
+
       return sendJson(
         res,
         {
           success: true,
 
           gameId:
-            Number(game.game_id),
+            Number(
+              game.game_id
+            ),
 
           status:
             game.status,
 
-          calledNumbers:
-            game.called_numbers ||
-            [],
+          calledNumbers,
 
           winner:
             game.status ===
@@ -2046,8 +2373,11 @@ app.get(
                     null,
 
                   cardNumber:
-                    game.winner_card_number ||
-                    null
+                    game.winner_card_number
+                      ? Number(
+                          game.winner_card_number
+                        )
+                      : null
                 }
               : null
         }
@@ -2063,7 +2393,9 @@ app.get(
         {
           success: false,
           error:
-            "Could not load game."
+            "Could not load game.",
+          details:
+            error.message
         },
         500
       );
