@@ -7,14 +7,20 @@ const crypto = require("crypto");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const DATABASE_URL = process.env.DATABASE_URL;
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 10000);
+
+const RENDER_URL =
+  "https://telegram-bingo-bot-q54q.onrender.com";
+
+const MINIAPP_URL =
+  `${RENDER_URL}/miniapp`;
 
 if (!BOT_TOKEN) {
-  throw new Error("BOT_TOKEN is missing");
+  throw new Error("BOT_TOKEN environment variable is missing");
 }
 
 if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL is missing");
+  throw new Error("DATABASE_URL environment variable is missing");
 }
 
 const bot = new Telegraf(BOT_TOKEN);
@@ -25,9 +31,6 @@ const pool = new Pool({
     rejectUnauthorized: false
   }
 });
-
-const MINIAPP_URL =
-  "https://telegram-bingo-bot-q54q.onrender.com/miniapp";
 
 /* =========================================================
    DATABASE
@@ -61,29 +64,33 @@ async function initDatabase() {
   `);
 
   await pool.query(`
-    INSERT INTO game_state (id, called_numbers, status)
-    VALUES (1, '[]'::jsonb, 'waiting')
+    INSERT INTO game_state
+      (id, called_numbers, status)
+    VALUES
+      (1, '[]'::jsonb, 'waiting')
     ON CONFLICT (id) DO NOTHING
   `);
 
   await generatePermanentCards();
 
-  console.log("Database initialized");
+  console.log("Database ready");
 }
 
 /* =========================================================
-   BINGO CARD GENERATION
+   RANDOM / BINGO CARD
 ========================================================= */
 
 function shuffle(array) {
-  const arr = [...array];
+  const result = [...array];
 
-  for (let i = arr.length - 1; i > 0; i--) {
+  for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+
+    [result[i], result[j]] =
+      [result[j], result[i]];
   }
 
-  return arr;
+  return result;
 }
 
 function generateCard() {
@@ -107,19 +114,13 @@ function generateCard() {
     Array.from({ length: 15 }, (_, i) => i + 61)
   ).slice(0, 5);
 
-  const card = [];
-
-  for (let row = 0; row < 5; row++) {
-    card.push([
-      B[row],
-      I[row],
-      row === 2 ? "FREE" : N[row],
-      G[row],
-      O[row]
-    ]);
-  }
-
-  return card;
+  return [
+    [B[0], I[0], N[0], G[0], O[0]],
+    [B[1], I[1], N[1], G[1], O[1]],
+    [B[2], I[2], "FREE", G[2], O[2]],
+    [B[3], I[3], N[3], G[3], O[3]],
+    [B[4], I[4], N[4], G[4], O[4]]
+  ];
 }
 
 function cardKey(card) {
@@ -127,34 +128,24 @@ function cardKey(card) {
 }
 
 async function generatePermanentCards() {
-  const result = await pool.query(
-    `SELECT COUNT(*)::int AS count FROM bingo_cards`
+  const result = await pool.query(`
+    SELECT card_number, card
+    FROM bingo_cards
+    ORDER BY card_number
+  `);
+
+  const existingNumbers = new Set(
+    result.rows.map(row => Number(row.card_number))
   );
 
-  const existingCount = result.rows[0].count;
-
-  if (existingCount >= 100) {
-    console.log("100 permanent Bingo cards already exist");
-    return;
-  }
-
-  const existing = await pool.query(
-    `SELECT card FROM bingo_cards`
-  );
-
-  const used = new Set(
-    existing.rows.map(row => cardKey(row.card))
+  const usedCards = new Set(
+    result.rows.map(row => cardKey(row.card))
   );
 
   let created = 0;
 
-  for (let cardNumber = 1; cardNumber <= 100; cardNumber++) {
-    const alreadyExists = await pool.query(
-      `SELECT 1 FROM bingo_cards WHERE card_number = $1`,
-      [cardNumber]
-    );
-
-    if (alreadyExists.rowCount > 0) {
+  for (let number = 1; number <= 100; number++) {
+    if (existingNumbers.has(number)) {
       continue;
     }
 
@@ -162,128 +153,114 @@ async function generatePermanentCards() {
 
     do {
       card = generateCard();
-    } while (used.has(cardKey(card)));
+    } while (usedCards.has(cardKey(card)));
 
-    used.add(cardKey(card));
+    usedCards.add(cardKey(card));
 
     await pool.query(
       `
-      INSERT INTO bingo_cards (card_number, card)
-      VALUES ($1, $2)
+      INSERT INTO bingo_cards
+        (card_number, card)
+      VALUES
+        ($1, $2)
       `,
-      [cardNumber, JSON.stringify(card)]
+      [number, JSON.stringify(card)]
     );
 
     created++;
   }
 
-  console.log(`Created ${created} new permanent Bingo cards`);
+  console.log(
+    `Permanent cards ready. Created ${created} new cards.`
+  );
 }
 
 /* =========================================================
-   TELEGRAM INIT DATA AUTHENTICATION
+   TELEGRAM WEB APP AUTHENTICATION
 ========================================================= */
 
 function validateTelegramInitData(initData) {
   if (!initData) {
-    throw new Error("Missing Telegram initData");
+    throw new Error("Telegram initData is missing");
   }
 
   const params = new URLSearchParams(initData);
+
   const hash = params.get("hash");
 
   if (!hash) {
-    throw new Error("Missing Telegram hash");
+    throw new Error("Telegram hash is missing");
   }
 
   params.delete("hash");
 
-  const dataCheckString = [...params.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
-    .join("\n");
+  const dataCheckString =
+    [...params.entries()]
+      .sort(([a], [b]) =>
+        a.localeCompare(b)
+      )
+      .map(([key, value]) =>
+        `${key}=${value}`
+      )
+      .join("\n");
 
-  const secretKey = crypto
-    .createHmac("sha256", "WebAppData")
-    .update(BOT_TOKEN)
-    .digest();
+  const secretKey =
+    crypto
+      .createHmac(
+        "sha256",
+        "WebAppData"
+      )
+      .update(BOT_TOKEN)
+      .digest();
 
-  const calculatedHash = crypto
-    .createHmac("sha256", secretKey)
-    .update(dataCheckString)
-    .digest("hex");
+  const calculatedHash =
+    crypto
+      .createHmac(
+        "sha256",
+        secretKey
+      )
+      .update(dataCheckString)
+      .digest("hex");
 
   if (
-    calculatedHash.length !== hash.length ||
+    calculatedHash.length !== hash.length
+  ) {
+    throw new Error(
+      "Invalid Telegram authentication"
+    );
+  }
+
+  if (
     !crypto.timingSafeEqual(
       Buffer.from(calculatedHash),
       Buffer.from(hash)
     )
   ) {
-    throw new Error("Invalid Telegram initData");
+    throw new Error(
+      "Invalid Telegram authentication"
+    );
   }
 
-  const authDate = Number(params.get("auth_date"));
+  const userData =
+    params.get("user");
 
-  if (!authDate) {
-    throw new Error("Missing auth_date");
+  if (!userData) {
+    throw new Error(
+      "Telegram user information is missing"
+    );
   }
 
-  const maxAge = 24 * 60 * 60;
-
-  if (Math.floor(Date.now() / 1000) - authDate > maxAge) {
-    throw new Error("Telegram initData expired");
-  }
-
-  const userString = params.get("user");
-
-  if (!userString) {
-    throw new Error("Telegram user missing");
-  }
-
-  return JSON.parse(userString);
+  return JSON.parse(userData);
 }
 
-/* =========================================================
-   HTTP HELPERS
-========================================================= */
+function getInitDataFromRequest(req, body = {}) {
+  const authorization =
+    req.headers.authorization || "";
 
-function sendJson(res, statusCode, data) {
-  res.writeHead(statusCode, {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
-  });
-
-  res.end(JSON.stringify(data));
-}
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = "";
-
-    req.on("data", chunk => {
-      body += chunk;
-    });
-
-    req.on("end", () => {
-      try {
-        resolve(body ? JSON.parse(body) : {});
-      } catch (error) {
-        reject(error);
-      }
-    });
-
-    req.on("error", reject);
-  });
-}
-
-function getInitData(req, body = {}) {
-  const authHeader = req.headers.authorization || "";
-
-  if (authHeader.startsWith("tma ")) {
-    return authHeader.substring(4);
+  if (
+    authorization.startsWith("tma ")
+  ) {
+    return authorization.substring(4);
   }
 
   if (body.initData) {
@@ -293,18 +270,16 @@ function getInitData(req, body = {}) {
   return null;
 }
 
-/* =========================================================
-   AUTHENTICATED PLAYER
-========================================================= */
+function authenticateRequest(req, body = {}) {
+  const initData =
+    getInitDataFromRequest(
+      req,
+      body
+    );
 
-function authenticatePlayer(req, body = {}) {
-  const initData = getInitData(req, body);
-
-  if (!initData) {
-    throw new Error("Telegram authentication required");
-  }
-
-  return validateTelegramInitData(initData);
+  return validateTelegramInitData(
+    initData
+  );
 }
 
 /* =========================================================
@@ -312,9 +287,9 @@ function authenticatePlayer(req, body = {}) {
 ========================================================= */
 
 function hasBingo(card, markedNumbers) {
-  const marked = new Set(markedNumbers);
+  const marked =
+    new Set(markedNumbers || []);
 
-  // Center is automatically free
   marked.add("FREE");
 
   // Rows
@@ -328,7 +303,9 @@ function hasBingo(card, markedNumbers) {
       }
     }
 
-    if (complete) return true;
+    if (complete) {
+      return true;
+    }
   }
 
   // Columns
@@ -342,10 +319,12 @@ function hasBingo(card, markedNumbers) {
       }
     }
 
-    if (complete) return true;
+    if (complete) {
+      return true;
+    }
   }
 
-  // Diagonal
+  // Diagonal 1
   let diagonal1 = true;
 
   for (let i = 0; i < 5; i++) {
@@ -355,9 +334,11 @@ function hasBingo(card, markedNumbers) {
     }
   }
 
-  if (diagonal1) return true;
+  if (diagonal1) {
+    return true;
+  }
 
-  // Other diagonal
+  // Diagonal 2
   let diagonal2 = true;
 
   for (let i = 0; i < 5; i++) {
@@ -371,7 +352,25 @@ function hasBingo(card, markedNumbers) {
 }
 
 /* =========================================================
-   TELEGRAM BOT COMMANDS
+   BOT KEYBOARD
+========================================================= */
+
+const mainKeyboard = {
+  keyboard: [
+    [{ text: "▶️ Start" }],
+    [{ text: "🎮 Play" }],
+    [{ text: "💰 Deposit" }],
+    [{ text: "💵 Balance" }],
+    [{ text: "🏧 Withdraw" }],
+    [{ text: "❓ HIW / How to Play" }],
+    [{ text: "📨 Invite" }],
+    [{ text: "🆘 Support" }]
+  ],
+  resize_keyboard: true
+};
+
+/* =========================================================
+   BOT COMMANDS
 ========================================================= */
 
 bot.start(async ctx => {
@@ -379,584 +378,879 @@ bot.start(async ctx => {
 
   await pool.query(
     `
-    INSERT INTO players (user_id, name)
-    VALUES ($1, $2)
+    INSERT INTO players
+      (user_id, name)
+    VALUES
+      ($1, $2)
     ON CONFLICT (user_id)
-    DO UPDATE SET name = EXCLUDED.name
+    DO UPDATE SET
+      name = EXCLUDED.name
     `,
-    [user.id, user.first_name || "Player"]
+    [
+      user.id,
+      user.first_name || "Player"
+    ]
   );
 
   await ctx.reply(
-    `🎉 Welcome to Telegram Bingo, ${user.first_name || "Player"}!\n\nChoose an option below:`,
+    `🎉 Welcome to Telegram Bingo, ${
+      user.first_name || "Player"
+    }!\n\nChoose an option:`,
     {
-      reply_markup: {
-        keyboard: [
-          [{ text: "▶️ Start" }],
-          [{ text: "🎮 Play" }],
-          [{ text: "💰 Deposit" }],
-          [{ text: "💵 Balance" }],
-          [{ text: "🏧 Withdraw" }],
-          [{ text: "❓ HIW / How to Play" }],
-          [{ text: "📨 Invite" }],
-          [{ text: "🆘 Support" }]
-        ],
-        resize_keyboard: true
-      }
+      reply_markup: mainKeyboard
     }
   );
 });
 
 bot.command("play", async ctx => {
-  await ctx.reply("🎮 Choose your Bingo card:", {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: "🎯 Choose Card 1–100",
-            web_app: {
-              url: MINIAPP_URL
-            }
-          }
-        ]
-      ]
-    }
-  });
+  await sendPlayButton(ctx);
 });
 
 bot.hears("▶️ Start", async ctx => {
-  await ctx.reply("🎯 Press Play to choose your Bingo card.");
+  await ctx.reply(
+    "🎯 Welcome!\n\nPress 🎮 Play to choose your Bingo card.",
+    {
+      reply_markup: mainKeyboard
+    }
+  );
 });
 
 bot.hears("🎮 Play", async ctx => {
-  await ctx.reply("🎮 Choose your Bingo card:", {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: "🎯 Choose Card 1–100",
-            web_app: {
-              url: MINIAPP_URL
-            }
-          }
-        ]
-      ]
-    }
-  });
+  await sendPlayButton(ctx);
 });
+
+async function sendPlayButton(ctx) {
+  await ctx.reply(
+    "🎮 Choose your Bingo card:",
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: "🎯 Choose Card 1–100",
+              web_app: {
+                url: MINIAPP_URL
+              }
+            }
+          ]
+        ]
+      }
+    }
+  );
+}
 
 bot.hears("❓ HIW / How to Play", async ctx => {
   await ctx.reply(
-    `🎯 HOW TO PLAY BINGO
+    `🎯 HOW TO PLAY
 
 1️⃣ Press Play.
-2️⃣ Choose a card number from 1–100.
-3️⃣ Preview your 5×5 Bingo card.
-4️⃣ Press OK to confirm your card.
-5️⃣ Play the Bingo round.
-6️⃣ Mark your called numbers.
+2️⃣ Choose a card from 1–100.
+3️⃣ Preview the 5×5 card.
+4️⃣ Press OK.
+5️⃣ Play Bingo.
+6️⃣ Mark called numbers.
 7️⃣ Complete a row, column, or diagonal.
-8️⃣ Press BINGO.
-
-⭐ Every card number always has the same card layout.`
+8️⃣ Press BINGO.`
   );
 });
 
 bot.hears("📨 Invite", async ctx => {
   await ctx.reply(
-    "📨 Invite your friends to play Telegram Bingo!"
+    "📨 Invite your friends to Telegram Bingo!"
   );
 });
 
 bot.hears("🆘 Support", async ctx => {
   await ctx.reply(
-    "🆘 Support\n\nPlease contact the game administrator for help."
+    "🆘 Support\n\nPlease contact the administrator."
   );
 });
+
+/* =========================================================
+   PLACEHOLDER MONEY BUTTONS
+========================================================= */
+
+bot.hears("💰 Deposit", async ctx => {
+  await ctx.reply(
+    "💰 Deposit\n\nThis section will be connected later."
+  );
+});
+
+bot.hears("💵 Balance", async ctx => {
+  await ctx.reply(
+    "💵 Balance\n\nYour balance system will be connected later."
+  );
+});
+
+bot.hears("🏧 Withdraw", async ctx => {
+  await ctx.reply(
+    "🏧 Withdraw\n\nThis section will be connected later."
+  );
+});
+
+/* =========================================================
+   HTTP HELPERS
+========================================================= */
+
+function sendJson(res, status, data) {
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization",
+    "Access-Control-Allow-Methods":
+      "GET, POST, OPTIONS"
+  });
+
+  res.end(
+    JSON.stringify(data)
+  );
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+
+    req.on("data", chunk => {
+      body += chunk;
+    });
+
+    req.on("end", () => {
+      if (!body) {
+        resolve({});
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(body));
+      } catch (error) {
+        reject(
+          new Error("Invalid JSON")
+        );
+      }
+    });
+
+    req.on("error", reject);
+  });
+}
 
 /* =========================================================
    HTTP SERVER
 ========================================================= */
 
-const server = http.createServer(async (req, res) => {
-  if (req.method === "OPTIONS") {
-    sendJson(res, 200, {});
-    return;
-  }
+const server = http.createServer(
+  async (req, res) => {
+    try {
 
-  try {
-    /* ---------------------------------------------
-       MINI APP
-    --------------------------------------------- */
+      /* -----------------------------------------
+         CORS
+      ----------------------------------------- */
 
-    if (
-      req.method === "GET" &&
-      (req.url === "/" || req.url === "/miniapp")
-    ) {
-      const filePath = path.join(
-        __dirname,
-        "Miniapp",
-        "index.html"
-      );
-
-      if (!fs.existsSync(filePath)) {
-        res.writeHead(404, {
-          "Content-Type": "text/plain"
-        });
-
-        res.end("Mini App not found");
+      if (req.method === "OPTIONS") {
+        sendJson(res, 200, {});
         return;
       }
 
-      res.writeHead(200, {
-        "Content-Type": "text/html; charset=utf-8"
-      });
-
-      fs.createReadStream(filePath).pipe(res);
-      return;
-    }
-
-    /* ---------------------------------------------
-       GET ALL CARDS
-    --------------------------------------------- */
-
-    if (
-      req.method === "GET" &&
-      req.url === "/api/cards"
-    ) {
-      const result = await pool.query(`
-        SELECT card_number, card
-        FROM bingo_cards
-        ORDER BY card_number
-      `);
-
-      sendJson(res, 200, {
-        cards: result.rows
-      });
-
-      return;
-    }
-
-    /* ---------------------------------------------
-       GET MY CARD
-    --------------------------------------------- */
-
-    if (
-      req.method === "GET" &&
-      req.url.startsWith("/api/my-card")
-    ) {
-      const url = new URL(req.url, `http://${req.headers.host}`);
-
-      const initData =
-        req.headers.authorization?.startsWith("tma ")
-          ? req.headers.authorization.substring(4)
-          : url.searchParams.get("initData");
-
-      const user = validateTelegramInitData(initData);
-
-      const result = await pool.query(
-        `
-        SELECT
-          p.user_id,
-          p.name,
-          p.card_number,
-          p.marked_numbers,
-          c.card
-        FROM players p
-        LEFT JOIN bingo_cards c
-          ON p.card_number = c.card_number
-        WHERE p.user_id = $1
-        `,
-        [user.id]
-      );
-
-      if (result.rowCount === 0) {
-        sendJson(res, 404, {
-          error: "Player not found"
-        });
-
-        return;
-      }
-
-      const game = await pool.query(`
-        SELECT
-          called_numbers,
-          winner_user_id,
-          winner_name,
-          status
-        FROM game_state
-        WHERE id = 1
-      `);
-
-      sendJson(res, 200, {
-        playerName: result.rows[0].name,
-        cardNumber: result.rows[0].card_number,
-        card: result.rows[0].card,
-        markedNumbers: result.rows[0].marked_numbers || [],
-        calledNumbers: game.rows[0].called_numbers || [],
-        winnerUserId: game.rows[0].winner_user_id,
-        winnerName: game.rows[0].winner_name,
-        status: game.rows[0].status
-      });
-
-      return;
-    }
-
-    /* ---------------------------------------------
-       SELECT CARD
-    --------------------------------------------- */
-
-    if (
-      req.method === "POST" &&
-      req.url === "/api/select-card"
-    ) {
-      const body = await readBody(req);
-      const user = authenticatePlayer(req, body);
-
-      const cardNumber = Number(body.cardNumber);
+      /* -----------------------------------------
+         TELEGRAM WEBHOOK
+      ----------------------------------------- */
 
       if (
-        !Number.isInteger(cardNumber) ||
-        cardNumber < 1 ||
-        cardNumber > 100
+        req.method === "POST" &&
+        req.url === "/telegram-webhook"
       ) {
-        sendJson(res, 400, {
-          error: "Card number must be between 1 and 100"
-        });
+        const update =
+          await readBody(req);
 
-        return;
-      }
-
-      const card = await pool.query(
-        `
-        SELECT card_number, card
-        FROM bingo_cards
-        WHERE card_number = $1
-        `,
-        [cardNumber]
-      );
-
-      if (card.rowCount === 0) {
-        sendJson(res, 404, {
-          error: "Card not found"
-        });
-
-        return;
-      }
-
-      await pool.query(
-        `
-        INSERT INTO players
-          (user_id, name, card_number, marked_numbers)
-        VALUES
-          ($1, $2, $3, '[]'::jsonb)
-        ON CONFLICT (user_id)
-        DO UPDATE SET
-          name = EXCLUDED.name,
-          card_number = EXCLUDED.card_number,
-          marked_numbers = '[]'::jsonb
-        `,
-        [
-          user.id,
-          user.first_name || "Player",
-          cardNumber
-        ]
-      );
-
-      sendJson(res, 200, {
-        success: true,
-        cardNumber,
-        card: card.rows[0].card
-      });
-
-      return;
-    }
-
-    /* ---------------------------------------------
-       MARK NUMBER
-    --------------------------------------------- */
-
-    if (
-      req.method === "POST" &&
-      req.url === "/api/mark"
-    ) {
-      const body = await readBody(req);
-      const user = authenticatePlayer(req, body);
-
-      const number = Number(body.number);
-
-      if (!Number.isInteger(number)) {
-        sendJson(res, 400, {
-          error: "Invalid number"
-        });
-
-        return;
-      }
-
-      const gameResult = await pool.query(`
-        SELECT called_numbers
-        FROM game_state
-        WHERE id = 1
-      `);
-
-      const calledNumbers =
-        gameResult.rows[0].called_numbers || [];
-
-      if (!calledNumbers.includes(number)) {
-        sendJson(res, 400, {
-          error: "That number has not been called"
-        });
-
-        return;
-      }
-
-      const playerResult = await pool.query(
-        `
-        SELECT marked_numbers
-        FROM players
-        WHERE user_id = $1
-        `,
-        [user.id]
-      );
-
-      if (playerResult.rowCount === 0) {
-        sendJson(res, 404, {
-          error: "Player not found"
-        });
-
-        return;
-      }
-
-      const marked =
-        playerResult.rows[0].marked_numbers || [];
-
-      if (!marked.includes(number)) {
-        marked.push(number);
-      }
-
-      await pool.query(
-        `
-        UPDATE players
-        SET marked_numbers = $1
-        WHERE user_id = $2
-        `,
-        [JSON.stringify(marked), user.id]
-      );
-
-      sendJson(res, 200, {
-        success: true,
-        markedNumbers: marked
-      });
-
-      return;
-    }
-
-    /* ---------------------------------------------
-       UNMARK NUMBER
-    --------------------------------------------- */
-
-    if (
-      req.method === "POST" &&
-      req.url === "/api/unmark"
-    ) {
-      const body = await readBody(req);
-      const user = authenticatePlayer(req, body);
-
-      const number = Number(body.number);
-
-      const playerResult = await pool.query(
-        `
-        SELECT marked_numbers
-        FROM players
-        WHERE user_id = $1
-        `,
-        [user.id]
-      );
-
-      if (playerResult.rowCount === 0) {
-        sendJson(res, 404, {
-          error: "Player not found"
-        });
-
-        return;
-      }
-
-      let marked =
-        playerResult.rows[0].marked_numbers || [];
-
-      marked = marked.filter(n => n !== number);
-
-      await pool.query(
-        `
-        UPDATE players
-        SET marked_numbers = $1
-        WHERE user_id = $2
-        `,
-        [JSON.stringify(marked), user.id]
-      );
-
-      sendJson(res, 200, {
-        success: true,
-        markedNumbers: marked
-      });
-
-      return;
-    }
-
-    /* ---------------------------------------------
-       BINGO
-    --------------------------------------------- */
-
-    if (
-      req.method === "POST" &&
-      req.url === "/api/bingo"
-    ) {
-      const body = await readBody(req);
-      const user = authenticatePlayer(req, body);
-
-      const client = await pool.connect();
-
-      try {
-        await client.query("BEGIN");
-
-        const gameResult = await client.query(`
-          SELECT
-            called_numbers,
-            winner_user_id,
-            winner_name,
-            status
-          FROM game_state
-          WHERE id = 1
-          FOR UPDATE
-        `);
-
-        const game = gameResult.rows[0];
-
-        if (game.winner_user_id) {
-          await client.query("ROLLBACK");
-
-          sendJson(res, 200, {
-            bingo: false,
-            message: `Winner already declared: ${game.winner_name}`
-          });
-
-          return;
-        }
-
-        const playerResult = await client.query(
-          `
-          SELECT
-            p.name,
-            p.marked_numbers,
-            c.card
-          FROM players p
-          JOIN bingo_cards c
-            ON p.card_number = c.card_number
-          WHERE p.user_id = $1
-          `,
-          [user.id]
+        await bot.handleUpdate(
+          update
         );
-
-        if (playerResult.rowCount === 0) {
-          await client.query("ROLLBACK");
-
-          sendJson(res, 404, {
-            error: "Player/card not found"
-          });
-
-          return;
-        }
-
-        const player = playerResult.rows[0];
-
-        const bingo = hasBingo(
-          player.card,
-          player.marked_numbers || []
-        );
-
-        if (!bingo) {
-          await client.query("ROLLBACK");
-
-          sendJson(res, 200, {
-            bingo: false,
-            message: "You do not have Bingo yet."
-          });
-
-          return;
-        }
-
-        await client.query(
-          `
-          UPDATE game_state
-          SET
-            winner_user_id = $1,
-            winner_name = $2,
-            status = 'finished'
-          WHERE id = 1
-          `,
-          [user.id, player.name]
-        );
-
-        await client.query("COMMIT");
 
         sendJson(res, 200, {
-          bingo: true,
-          winner: player.name
+          ok: true
         });
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
+
+        return;
       }
 
-      return;
+      /* -----------------------------------------
+         MINI APP
+      ----------------------------------------- */
+
+      if (
+        req.method === "GET" &&
+        (
+          req.url === "/" ||
+          req.url === "/miniapp"
+        )
+      ) {
+        const filePath =
+          path.join(
+            __dirname,
+            "Miniapp",
+            "index.html"
+          );
+
+        if (!fs.existsSync(filePath)) {
+          sendJson(res, 404, {
+            error:
+              "Miniapp/index.html not found"
+          });
+
+          return;
+        }
+
+        res.writeHead(200, {
+          "Content-Type":
+            "text/html; charset=utf-8"
+        });
+
+        fs.createReadStream(
+          filePath
+        ).pipe(res);
+
+        return;
+      }
+
+      /* -----------------------------------------
+         HEALTH CHECK
+      ----------------------------------------- */
+
+      if (
+        req.method === "GET" &&
+        req.url === "/health"
+      ) {
+        sendJson(res, 200, {
+          status: "ok"
+        });
+
+        return;
+      }
+
+      /* -----------------------------------------
+         GET 100 CARDS
+      ----------------------------------------- */
+
+      if (
+        req.method === "GET" &&
+        req.url === "/api/cards"
+      ) {
+        const result =
+          await pool.query(`
+            SELECT
+              card_number,
+              card
+            FROM bingo_cards
+            ORDER BY card_number
+          `);
+
+        sendJson(res, 200, {
+          cards: result.rows
+        });
+
+        return;
+      }
+
+      /* -----------------------------------------
+         GET MY CARD
+      ----------------------------------------- */
+
+      if (
+        req.method === "GET" &&
+        req.url.startsWith(
+          "/api/my-card"
+        )
+      ) {
+        const url =
+          new URL(
+            req.url,
+            `http://${req.headers.host}`
+          );
+
+        const initData =
+          url.searchParams.get(
+            "initData"
+          );
+
+        const user =
+          validateTelegramInitData(
+            initData
+          );
+
+        const playerResult =
+          await pool.query(
+            `
+            SELECT
+              p.user_id,
+              p.name,
+              p.card_number,
+              p.marked_numbers,
+              c.card
+            FROM players p
+            LEFT JOIN bingo_cards c
+              ON p.card_number =
+                 c.card_number
+            WHERE p.user_id = $1
+            `,
+            [user.id]
+          );
+
+        if (
+          playerResult.rowCount === 0
+        ) {
+          sendJson(res, 404, {
+            error:
+              "Player not found"
+          });
+
+          return;
+        }
+
+        const gameResult =
+          await pool.query(`
+            SELECT
+              called_numbers,
+              winner_user_id,
+              winner_name,
+              status
+            FROM game_state
+            WHERE id = 1
+          `);
+
+        const player =
+          playerResult.rows[0];
+
+        const game =
+          gameResult.rows[0];
+
+        sendJson(res, 200, {
+          playerName: player.name,
+          cardNumber: player.card_number,
+          card: player.card,
+          markedNumbers:
+            player.marked_numbers || [],
+          calledNumbers:
+            game.called_numbers || [],
+          winnerUserId:
+            game.winner_user_id,
+          winnerName:
+            game.winner_name,
+          status:
+            game.status
+        });
+
+        return;
+      }
+
+      /* -----------------------------------------
+         SELECT CARD
+      ----------------------------------------- */
+
+      if (
+        req.method === "POST" &&
+        req.url === "/api/select-card"
+      ) {
+        const body =
+          await readBody(req);
+
+        const user =
+          authenticateRequest(
+            req,
+            body
+          );
+
+        const cardNumber =
+          Number(body.cardNumber);
+
+        if (
+          !Number.isInteger(
+            cardNumber
+          ) ||
+          cardNumber < 1 ||
+          cardNumber > 100
+        ) {
+          sendJson(res, 400, {
+            error:
+              "Card number must be between 1 and 100"
+          });
+
+          return;
+        }
+
+        const cardResult =
+          await pool.query(
+            `
+            SELECT
+              card_number,
+              card
+            FROM bingo_cards
+            WHERE card_number = $1
+            `,
+            [cardNumber]
+          );
+
+        if (
+          cardResult.rowCount === 0
+        ) {
+          sendJson(res, 404, {
+            error:
+              "Card not found"
+          });
+
+          return;
+        }
+
+        await pool.query(
+          `
+          INSERT INTO players
+            (
+              user_id,
+              name,
+              card_number,
+              marked_numbers
+            )
+          VALUES
+            ($1, $2, $3, '[]'::jsonb)
+          ON CONFLICT (user_id)
+          DO UPDATE SET
+            name = EXCLUDED.name,
+            card_number =
+              EXCLUDED.card_number,
+            marked_numbers =
+              '[]'::jsonb
+          `,
+          [
+            user.id,
+            user.first_name ||
+              "Player",
+            cardNumber
+          ]
+        );
+
+        sendJson(res, 200, {
+          success: true,
+          cardNumber,
+          card:
+            cardResult.rows[0].card
+        });
+
+        return;
+      }
+
+      /* -----------------------------------------
+         MARK
+      ----------------------------------------- */
+
+      if (
+        req.method === "POST" &&
+        req.url === "/api/mark"
+      ) {
+        const body =
+          await readBody(req);
+
+        const user =
+          authenticateRequest(
+            req,
+            body
+          );
+
+        const number =
+          Number(body.number);
+
+        if (
+          !Number.isInteger(number) ||
+          number < 1 ||
+          number > 75
+        ) {
+          sendJson(res, 400, {
+            error:
+              "Invalid Bingo number"
+          });
+
+          return;
+        }
+
+        const gameResult =
+          await pool.query(`
+            SELECT called_numbers
+            FROM game_state
+            WHERE id = 1
+          `);
+
+        const called =
+          gameResult.rows[0]
+            ?.called_numbers || [];
+
+        if (!called.includes(number)) {
+          sendJson(res, 400, {
+            error:
+              "That number has not been called yet"
+          });
+
+          return;
+        }
+
+        const playerResult =
+          await pool.query(
+            `
+            SELECT marked_numbers
+            FROM players
+            WHERE user_id = $1
+            `,
+            [user.id]
+          );
+
+        if (
+          playerResult.rowCount === 0
+        ) {
+          sendJson(res, 404, {
+            error:
+              "Choose a card first"
+          });
+
+          return;
+        }
+
+        const marked =
+          playerResult.rows[0]
+            .marked_numbers || [];
+
+        if (!marked.includes(number)) {
+          marked.push(number);
+        }
+
+        await pool.query(
+          `
+          UPDATE players
+          SET marked_numbers = $1
+          WHERE user_id = $2
+          `,
+          [
+            JSON.stringify(marked),
+            user.id
+          ]
+        );
+
+        sendJson(res, 200, {
+          success: true,
+          markedNumbers: marked
+        });
+
+        return;
+      }
+
+      /* -----------------------------------------
+         UNMARK
+      ----------------------------------------- */
+
+      if (
+        req.method === "POST" &&
+        req.url === "/api/unmark"
+      ) {
+        const body =
+          await readBody(req);
+
+        const user =
+          authenticateRequest(
+            req,
+            body
+          );
+
+        const number =
+          Number(body.number);
+
+        const playerResult =
+          await pool.query(
+            `
+            SELECT marked_numbers
+            FROM players
+            WHERE user_id = $1
+            `,
+            [user.id]
+          );
+
+        if (
+          playerResult.rowCount === 0
+        ) {
+          sendJson(res, 404, {
+            error:
+              "Player not found"
+          });
+
+          return;
+        }
+
+        let marked =
+          playerResult.rows[0]
+            .marked_numbers || [];
+
+        marked =
+          marked.filter(
+            n => n !== number
+          );
+
+        await pool.query(
+          `
+          UPDATE players
+          SET marked_numbers = $1
+          WHERE user_id = $2
+          `,
+          [
+            JSON.stringify(marked),
+            user.id
+          ]
+        );
+
+        sendJson(res, 200, {
+          success: true,
+          markedNumbers: marked
+        });
+
+        return;
+      }
+
+      /* -----------------------------------------
+         BINGO
+      ----------------------------------------- */
+
+      if (
+        req.method === "POST" &&
+        req.url === "/api/bingo"
+      ) {
+        const body =
+          await readBody(req);
+
+        const user =
+          authenticateRequest(
+            req,
+            body
+          );
+
+        const client =
+          await pool.connect();
+
+        try {
+          await client.query(
+            "BEGIN"
+          );
+
+          const gameResult =
+            await client.query(`
+              SELECT
+                called_numbers,
+                winner_user_id,
+                winner_name,
+                status
+              FROM game_state
+              WHERE id = 1
+              FOR UPDATE
+            `);
+
+          const game =
+            gameResult.rows[0];
+
+          if (game.winner_user_id) {
+            await client.query(
+              "ROLLBACK"
+            );
+
+            sendJson(res, 200, {
+              bingo: false,
+              message:
+                `Winner already declared: ${game.winner_name}`
+            });
+
+            return;
+          }
+
+          const playerResult =
+            await client.query(
+              `
+              SELECT
+                p.name,
+                p.marked_numbers,
+                c.card
+              FROM players p
+              JOIN bingo_cards c
+                ON p.card_number =
+                   c.card_number
+              WHERE p.user_id = $1
+              `,
+              [user.id]
+            );
+
+          if (
+            playerResult.rowCount === 0
+          ) {
+            await client.query(
+              "ROLLBACK"
+            );
+
+            sendJson(res, 404, {
+              error:
+                "Choose a card first"
+            });
+
+            return;
+          }
+
+          const player =
+            playerResult.rows[0];
+
+          const bingo =
+            hasBingo(
+              player.card,
+              player.marked_numbers
+            );
+
+          if (!bingo) {
+            await client.query(
+              "ROLLBACK"
+            );
+
+            sendJson(res, 200, {
+              bingo: false,
+              message:
+                "You do not have Bingo yet."
+            });
+
+            return;
+          }
+
+          await client.query(
+            `
+            UPDATE game_state
+            SET
+              winner_user_id = $1,
+              winner_name = $2,
+              status = 'finished'
+            WHERE id = 1
+            `,
+            [
+              user.id,
+              player.name
+            ]
+          );
+
+          await client.query(
+            "COMMIT"
+          );
+
+          sendJson(res, 200, {
+            bingo: true,
+            winner: player.name
+          });
+
+        } catch (error) {
+
+          await client.query(
+            "ROLLBACK"
+          );
+
+          throw error;
+
+        } finally {
+
+          client.release();
+        }
+
+        return;
+      }
+
+      /* -----------------------------------------
+         404
+      ----------------------------------------- */
+
+      sendJson(res, 404, {
+        error: "Not found"
+      });
+
+    } catch (error) {
+
+      console.error(
+        "Request error:",
+        error
+      );
+
+      sendJson(res, 500, {
+        error:
+          error.message ||
+          "Internal server error"
+      });
     }
-
-    sendJson(res, 404, {
-      error: "Not found"
-    });
-  } catch (error) {
-    console.error(error);
-
-    sendJson(res, 500, {
-      error: error.message || "Server error"
-    });
   }
-});
+);
 
 /* =========================================================
-   START
+   START SERVER
 ========================================================= */
 
 async function start() {
   try {
+
     await initDatabase();
 
-    await bot.telegram.deleteWebhook({
-      drop_pending_updates: true
-    });
-
     const webhookUrl =
-      `https://telegram-bingo-bot-q54q.onrender.com/telegram-webhook`;
+      `${RENDER_URL}/telegram-webhook`;
 
-    await bot.telegram.setWebhook(webhookUrl);
-
-    server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-
-    bot.startWebhook(
-      "/telegram-webhook",
-      null,
-      PORT
+    await bot.telegram.setWebhook(
+      webhookUrl,
+      {
+        drop_pending_updates: true
+      }
     );
 
-    console.log("Telegram Bingo bot started");
+    server.listen(
+      PORT,
+      "0.0.0.0",
+      () => {
+        console.log(
+          `Server listening on port ${PORT}`
+        );
+
+        console.log(
+          `Webhook: ${webhookUrl}`
+        );
+
+        console.log(
+          `Mini App: ${MINIAPP_URL}`
+        );
+      }
+    );
+
   } catch (error) {
-    console.error("Startup error:", error);
+
+    console.error(
+      "STARTUP ERROR:",
+      error
+    );
+
     process.exit(1);
   }
 }
 
 start();
+
+/* =========================================================
+   SHUTDOWN
+========================================================= */
+
+process.once(
+  "SIGINT",
+  async () => {
+    await bot.stop();
+    await pool.end();
+    server.close();
+    process.exit(0);
+  }
+);
+
+process.once(
+  "SIGTERM",
+  async () => {
+    await bot.stop();
+    await pool.end();
+    server.close();
+    process.exit(0);
+  }
+);
