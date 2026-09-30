@@ -147,7 +147,7 @@ function checkBingo(card, markedNumbers) {
     }
   }
 
-  // Diagonal
+  // Main diagonal
   if (
     isMarked(card[0][0]) &&
     isMarked(card[1][1]) &&
@@ -184,6 +184,7 @@ bot.command("newgame", async ctx => {
   try {
     const chatId = ctx.chat.id;
     const hostId = ctx.from.id;
+
     const hostName =
       ctx.from.first_name ||
       ctx.from.username ||
@@ -214,6 +215,7 @@ bot.command("newgame", async ctx => {
       "🎉 New Bingo game created!\n\n" +
       "Players can now use /join to get a card."
     );
+
   } catch (error) {
     console.error(error);
     await ctx.reply("❌ Could not create the game.");
@@ -281,6 +283,7 @@ bot.command("join", async ctx => {
       `🎫 ${name}, your Bingo card is ready!\n\n` +
       `Use /play to open your card.`
     );
+
   } catch (error) {
     console.error(error);
     await ctx.reply("❌ Could not join the game.");
@@ -318,6 +321,7 @@ bot.command("players", async ctx => {
         .join("\n");
 
     await ctx.reply(text);
+
   } catch (error) {
     console.error(error);
     await ctx.reply("❌ Could not get players.");
@@ -385,6 +389,7 @@ bot.command("call", async ctx => {
       `🎱 Called number: ${number}\n\n` +
       `Numbers called: ${calledNumbers.length}/75`
     );
+
   } catch (error) {
     console.error(error);
     await ctx.reply("❌ Could not call a number.");
@@ -426,12 +431,34 @@ bot.command("play", async ctx => {
       );
     }
 
+    /*
+      IMPORTANT:
+      The game ID is the Telegram chat ID.
+
+      Telegram passes the value after startapp=
+      to the Mini App as start_param.
+    */
+
     const miniAppUrl =
-      `https://t.me/Rudivollerbingo_bot?startapp=${chatId}`;
+      `https://t.me/Rudivollerbingo_bot?startapp=${encodeURIComponent(chatId)}`;
 
     await ctx.reply(
-      `🎫 Open your Bingo card:\n\n${miniAppUrl}`
+      "🎫 Your Bingo card is ready!\n\n" +
+      "Press the button below to open your card.",
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "🎮 Play Bingo",
+                url: miniAppUrl
+              }
+            ]
+          ]
+        }
+      }
     );
+
   } catch (error) {
     console.error(error);
     await ctx.reply("❌ Could not open the Bingo card.");
@@ -504,6 +531,7 @@ bot.command("bingo", async ctx => {
     await ctx.reply(
       `🎉 BINGO!\n\n🏆 ${player.name} wins the game!`
     );
+
   } catch (error) {
     console.error(error);
     await ctx.reply("❌ Could not check Bingo.");
@@ -542,6 +570,7 @@ bot.command("endgame", async ctx => {
     );
 
     await ctx.reply("🛑 Bingo game ended.");
+
   } catch (error) {
     console.error(error);
     await ctx.reply("❌ Could not end the game.");
@@ -648,6 +677,7 @@ async function getCard(req, res) {
       calledNumbers: game.called_numbers || [],
       winner: game.winner
     });
+
   } catch (error) {
     console.error(error);
 
@@ -752,6 +782,7 @@ async function markNumber(req, res, shouldMark) {
       success: true,
       markedNumbers
     });
+
   } catch (error) {
     console.error(error);
 
@@ -844,6 +875,7 @@ async function bingoApi(req, res) {
       bingo: true,
       winner: player.name
     });
+
   } catch (error) {
     console.error(error);
 
@@ -891,6 +923,7 @@ function serveMiniApp(res) {
 
 const server = http.createServer(async (req, res) => {
   try {
+
     // Telegram webhook
     if (
       req.method === "POST" &&
@@ -912,8 +945,10 @@ const server = http.createServer(async (req, res) => {
     // Mini App
     if (
       req.method === "GET" &&
-      (url.pathname === "/" ||
-       url.pathname === "/miniapp")
+      (
+        url.pathname === "/" ||
+        url.pathname === "/miniapp"
+      )
     ) {
       return serveMiniApp(res);
     }
@@ -971,17 +1006,15 @@ const server = http.createServer(async (req, res) => {
    START
 ========================= */
 
-// Start HTTP server FIRST.
-// This prevents Render from reporting
-// "No open ports detected".
-
 server.listen(PORT, async () => {
-  console.log(`HTTP server running on port ${PORT}`);
+  console.log(
+    `HTTP server running on port ${PORT}`
+  );
 
   try {
     await initDatabase();
 
-    // Remove any old webhook first.
+    // Remove any old webhook.
     await bot.telegram.deleteWebhook();
 
     // Set the new webhook.
