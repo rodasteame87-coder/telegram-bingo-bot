@@ -15,12 +15,17 @@ const RENDER_URL =
 const MINIAPP_URL =
   `${RENDER_URL}/miniapp`;
 
+const MINIAPP_FILE =
+  path.join(__dirname, "miniapp", "index.html");
+
 if (!BOT_TOKEN) {
-  throw new Error("BOT_TOKEN environment variable is missing");
+  console.error("ERROR: BOT_TOKEN is missing.");
+  process.exit(1);
 }
 
 if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is missing");
+  console.error("ERROR: DATABASE_URL is missing.");
+  process.exit(1);
 }
 
 const bot = new Telegraf(BOT_TOKEN);
@@ -65,62 +70,85 @@ async function initDatabase() {
 
   await pool.query(`
     INSERT INTO game_state
-      (id, called_numbers, status)
+      (id, called_numbers, winner_user_id, winner_name, status)
     VALUES
-      (1, '[]'::jsonb, 'waiting')
+      (1, '[]'::jsonb, NULL, NULL, 'waiting')
     ON CONFLICT (id) DO NOTHING
   `);
 
   await generatePermanentCards();
 
-  console.log("Database ready");
+  console.log("Database initialized.");
 }
 
 /* =========================================================
-   RANDOM / BINGO CARD
+   BINGO CARD GENERATION
 ========================================================= */
 
 function shuffle(array) {
-  const result = [...array];
+  const copy = [...array];
 
-  for (let i = result.length - 1; i > 0; i--) {
+  for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
 
-    [result[i], result[j]] =
-      [result[j], result[i]];
+    [copy[i], copy[j]] =
+      [copy[j], copy[i]];
   }
 
-  return result;
+  return copy;
 }
 
 function generateCard() {
   const B = shuffle(
-    Array.from({ length: 15 }, (_, i) => i + 1)
+    Array.from(
+      { length: 15 },
+      (_, i) => i + 1
+    )
   ).slice(0, 5);
 
   const I = shuffle(
-    Array.from({ length: 15 }, (_, i) => i + 16)
+    Array.from(
+      { length: 15 },
+      (_, i) => i + 16
+    )
   ).slice(0, 5);
 
   const N = shuffle(
-    Array.from({ length: 15 }, (_, i) => i + 31)
+    Array.from(
+      { length: 15 },
+      (_, i) => i + 31
+    )
   ).slice(0, 5);
 
   const G = shuffle(
-    Array.from({ length: 15 }, (_, i) => i + 46)
+    Array.from(
+      { length: 15 },
+      (_, i) => i + 46
+    )
   ).slice(0, 5);
 
   const O = shuffle(
-    Array.from({ length: 15 }, (_, i) => i + 61)
+    Array.from(
+      { length: 15 },
+      (_, i) => i + 61
+    )
   ).slice(0, 5);
 
-  return [
-    [B[0], I[0], N[0], G[0], O[0]],
-    [B[1], I[1], N[1], G[1], O[1]],
-    [B[2], I[2], "FREE", G[2], O[2]],
-    [B[3], I[3], N[3], G[3], O[3]],
-    [B[4], I[4], N[4], G[4], O[4]]
-  ];
+  const card = [];
+
+  for (let row = 0; row < 5; row++) {
+    card.push([
+      B[row],
+      I[row],
+      N[row],
+      G[row],
+      O[row]
+    ]);
+  }
+
+  card[2][2] = "FREE";
+
+  return card;
 }
 
 function cardKey(card) {
@@ -128,24 +156,23 @@ function cardKey(card) {
 }
 
 async function generatePermanentCards() {
-  const result = await pool.query(`
-    SELECT card_number, card
-    FROM bingo_cards
-    ORDER BY card_number
-  `);
-
-  const existingNumbers = new Set(
-    result.rows.map(row => Number(row.card_number))
+  const existingResult = await pool.query(
+    `SELECT card_number, card FROM bingo_cards`
   );
 
-  const usedCards = new Set(
-    result.rows.map(row => cardKey(row.card))
-  );
+  const existingCards = new Set();
 
-  let created = 0;
+  for (const row of existingResult.rows) {
+    existingCards.add(cardKey(row.card));
+  }
 
   for (let number = 1; number <= 100; number++) {
-    if (existingNumbers.has(number)) {
+    const existing = await pool.query(
+      `SELECT card_number FROM bingo_cards WHERE card_number = $1`,
+      [number]
+    );
+
+    if (existing.rowCount > 0) {
       continue;
     }
 
@@ -153,9 +180,9 @@ async function generatePermanentCards() {
 
     do {
       card = generateCard();
-    } while (usedCards.has(cardKey(card)));
+    } while (existingCards.has(cardKey(card)));
 
-    usedCards.add(cardKey(card));
+    existingCards.add(cardKey(card));
 
     await pool.query(
       `
@@ -164,32 +191,33 @@ async function generatePermanentCards() {
       VALUES
         ($1, $2)
       `,
-      [number, JSON.stringify(card)]
+      [
+        number,
+        JSON.stringify(card)
+      ]
     );
-
-    created++;
   }
 
-  console.log(
-    `Permanent cards ready. Created ${created} new cards.`
-  );
+  console.log("Permanent Bingo cards 1-100 are ready.");
 }
 
 /* =========================================================
-   TELEGRAM WEB APP AUTHENTICATION
+   TELEGRAM MINI APP AUTHENTICATION
 ========================================================= */
 
 function validateTelegramInitData(initData) {
   if (!initData) {
-    throw new Error("Telegram initData is missing");
+    throw new Error("Telegram initData is missing.");
   }
 
-  const params = new URLSearchParams(initData);
+  const params =
+    new URLSearchParams(initData);
 
-  const hash = params.get("hash");
+  const hash =
+    params.get("hash");
 
   if (!hash) {
-    throw new Error("Telegram hash is missing");
+    throw new Error("Telegram hash is missing.");
   }
 
   params.delete("hash");
@@ -199,8 +227,9 @@ function validateTelegramInitData(initData) {
       .sort(([a], [b]) =>
         a.localeCompare(b)
       )
-      .map(([key, value]) =>
-        `${key}=${value}`
+      .map(
+        ([key, value]) =>
+          `${key}=${value}`
       )
       .join("\n");
 
@@ -222,38 +251,41 @@ function validateTelegramInitData(initData) {
       .update(dataCheckString)
       .digest("hex");
 
-  if (
-    calculatedHash.length !== hash.length
-  ) {
-    throw new Error(
-      "Invalid Telegram authentication"
+  const hashBuffer =
+    Buffer.from(hash, "hex");
+
+  const calculatedBuffer =
+    Buffer.from(
+      calculatedHash,
+      "hex"
     );
-  }
 
   if (
+    hashBuffer.length !==
+    calculatedBuffer.length ||
     !crypto.timingSafeEqual(
-      Buffer.from(calculatedHash),
-      Buffer.from(hash)
+      hashBuffer,
+      calculatedBuffer
     )
   ) {
     throw new Error(
-      "Invalid Telegram authentication"
+      "Invalid Telegram initData."
     );
   }
 
-  const userData =
+  const userString =
     params.get("user");
 
-  if (!userData) {
+  if (!userString) {
     throw new Error(
-      "Telegram user information is missing"
+      "Telegram user information is missing."
     );
   }
 
-  return JSON.parse(userData);
+  return JSON.parse(userString);
 }
 
-function getInitDataFromRequest(req, body = {}) {
+function getInitDataFromRequest(req, body = null) {
   const authorization =
     req.headers.authorization || "";
 
@@ -263,96 +295,26 @@ function getInitDataFromRequest(req, body = {}) {
     return authorization.substring(4);
   }
 
-  if (body.initData) {
+  if (
+    body &&
+    body.initData
+  ) {
     return body.initData;
   }
 
-  return null;
-}
-
-function authenticateRequest(req, body = {}) {
-  const initData =
-    getInitDataFromRequest(
-      req,
-      body
+  const url =
+    new URL(
+      req.url,
+      RENDER_URL
     );
 
-  return validateTelegramInitData(
-    initData
+  return url.searchParams.get(
+    "initData"
   );
 }
 
 /* =========================================================
-   BINGO CHECK
-========================================================= */
-
-function hasBingo(card, markedNumbers) {
-  const marked =
-    new Set(markedNumbers || []);
-
-  marked.add("FREE");
-
-  // Rows
-  for (let row = 0; row < 5; row++) {
-    let complete = true;
-
-    for (let col = 0; col < 5; col++) {
-      if (!marked.has(card[row][col])) {
-        complete = false;
-        break;
-      }
-    }
-
-    if (complete) {
-      return true;
-    }
-  }
-
-  // Columns
-  for (let col = 0; col < 5; col++) {
-    let complete = true;
-
-    for (let row = 0; row < 5; row++) {
-      if (!marked.has(card[row][col])) {
-        complete = false;
-        break;
-      }
-    }
-
-    if (complete) {
-      return true;
-    }
-  }
-
-  // Diagonal 1
-  let diagonal1 = true;
-
-  for (let i = 0; i < 5; i++) {
-    if (!marked.has(card[i][i])) {
-      diagonal1 = false;
-      break;
-    }
-  }
-
-  if (diagonal1) {
-    return true;
-  }
-
-  // Diagonal 2
-  let diagonal2 = true;
-
-  for (let i = 0; i < 5; i++) {
-    if (!marked.has(card[i][4 - i])) {
-      diagonal2 = false;
-      break;
-    }
-  }
-
-  return diagonal2;
-}
-
-/* =========================================================
-   BOT KEYBOARD
+   MAIN TELEGRAM MENU
 ========================================================= */
 
 const mainKeyboard = {
@@ -370,52 +332,41 @@ const mainKeyboard = {
 };
 
 /* =========================================================
-   BOT COMMANDS
+   TELEGRAM COMMANDS
 ========================================================= */
 
-bot.start(async ctx => {
-  const user = ctx.from;
+bot.start(async (ctx) => {
+  const user =
+    ctx.from;
 
   await pool.query(
     `
     INSERT INTO players
-      (user_id, name)
+      (user_id, name, marked_numbers)
     VALUES
-      ($1, $2)
+      ($1, $2, '[]'::jsonb)
     ON CONFLICT (user_id)
     DO UPDATE SET
       name = EXCLUDED.name
     `,
     [
       user.id,
-      user.first_name || "Player"
+      user.first_name ||
+      user.username ||
+      "Player"
     ]
   );
 
   await ctx.reply(
-    `🎉 Welcome to Telegram Bingo, ${
-      user.first_name || "Player"
-    }!\n\nChoose an option:`,
+    `Welcome ${user.first_name || "Player"}! 🎉\n\nChoose an option below:`,
     {
-      reply_markup: mainKeyboard
+      reply_markup:
+        mainKeyboard
     }
   );
 });
 
-bot.command("play", async ctx => {
-  await sendPlayButton(ctx);
-});
-
-bot.hears("▶️ Start", async ctx => {
-  await ctx.reply(
-    "🎯 Welcome!\n\nPress 🎮 Play to choose your Bingo card.",
-    {
-      reply_markup: mainKeyboard
-    }
-  );
-});
-
-bot.hears("🎮 Play", async ctx => {
+bot.command("play", async (ctx) => {
   await sendPlayButton(ctx);
 });
 
@@ -427,7 +378,7 @@ async function sendPlayButton(ctx) {
         inline_keyboard: [
           [
             {
-              text: "🎯 Choose Card 1–100",
+              text: "🎱 Open Bingo",
               web_app: {
                 url: MINIAPP_URL
               }
@@ -439,68 +390,138 @@ async function sendPlayButton(ctx) {
   );
 }
 
-bot.hears("❓ HIW / How to Play", async ctx => {
-  await ctx.reply(
-    `🎯 HOW TO PLAY
-
-1️⃣ Press Play.
-2️⃣ Choose a card from 1–100.
-3️⃣ Preview the 5×5 card.
-4️⃣ Press OK.
-5️⃣ Play Bingo.
-6️⃣ Mark called numbers.
-7️⃣ Complete a row, column, or diagonal.
-8️⃣ Press BINGO.`
-  );
-});
-
-bot.hears("📨 Invite", async ctx => {
-  await ctx.reply(
-    "📨 Invite your friends to Telegram Bingo!"
-  );
-});
-
-bot.hears("🆘 Support", async ctx => {
-  await ctx.reply(
-    "🆘 Support\n\nPlease contact the administrator."
-  );
-});
-
 /* =========================================================
-   PLACEHOLDER MONEY BUTTONS
+   MENU BUTTONS
 ========================================================= */
 
-bot.hears("💰 Deposit", async ctx => {
+bot.hears("▶️ Start", async (ctx) => {
+  const user =
+    ctx.from;
+
+  await pool.query(
+    `
+    INSERT INTO players
+      (user_id, name, marked_numbers)
+    VALUES
+      ($1, $2, '[]'::jsonb)
+    ON CONFLICT (user_id)
+    DO UPDATE SET
+      name = EXCLUDED.name
+    `,
+    [
+      user.id,
+      user.first_name ||
+      user.username ||
+      "Player"
+    ]
+  );
+
   await ctx.reply(
-    "💰 Deposit\n\nThis section will be connected later."
+    `Welcome ${user.first_name || "Player"}! 🎉`,
+    {
+      reply_markup:
+        mainKeyboard
+    }
   );
 });
 
-bot.hears("💵 Balance", async ctx => {
-  await ctx.reply(
-    "💵 Balance\n\nYour balance system will be connected later."
-  );
+bot.hears("🎮 Play", async (ctx) => {
+  await sendPlayButton(ctx);
 });
 
-bot.hears("🏧 Withdraw", async ctx => {
-  await ctx.reply(
-    "🏧 Withdraw\n\nThis section will be connected later."
-  );
-});
+bot.hears(
+  "❓ HIW / How to Play",
+  async (ctx) => {
+    await ctx.reply(
+      `🎱 HOW TO PLAY\n\n` +
+      `1️⃣ Press Play.\n` +
+      `2️⃣ Choose one card from 1–100.\n` +
+      `3️⃣ Preview your Bingo card.\n` +
+      `4️⃣ Press OK to confirm your card.\n` +
+      `5️⃣ Numbers are called during the game.\n` +
+      `6️⃣ Mark matching numbers on your card.\n` +
+      `7️⃣ Complete a valid Bingo pattern.\n\n` +
+      `Good luck! 🍀`
+    );
+  }
+);
+
+bot.hears(
+  "📨 Invite",
+  async (ctx) => {
+    const botInfo =
+      await bot.telegram.getMe();
+
+    const username =
+      botInfo.username;
+
+    const link =
+      `https://t.me/${username}?start=invite`;
+
+    await ctx.reply(
+      `📨 Invite your friends!\n\n` +
+      `Share this bot with your friends:\n` +
+      `${link}`
+    );
+  }
+);
+
+bot.hears(
+  "🆘 Support",
+  async (ctx) => {
+    await ctx.reply(
+      `🆘 Support\n\n` +
+      `For help, please contact the bot administrator.`
+    );
+  }
+);
+
+bot.hears(
+  "💰 Deposit",
+  async (ctx) => {
+    await ctx.reply(
+      `💰 Deposit\n\n` +
+      `Deposit functionality is not connected yet.`
+    );
+  }
+);
+
+bot.hears(
+  "💵 Balance",
+  async (ctx) => {
+    await ctx.reply(
+      `💵 Balance\n\n` +
+      `Balance functionality is not connected yet.`
+    );
+  }
+);
+
+bot.hears(
+  "🏧 Withdraw",
+  async (ctx) => {
+    await ctx.reply(
+      `🏧 Withdraw\n\n` +
+      `Withdrawal functionality is not connected yet.`
+    );
+  }
+);
 
 /* =========================================================
    HTTP HELPERS
 ========================================================= */
 
-function sendJson(res, status, data) {
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers":
-      "Content-Type, Authorization",
-    "Access-Control-Allow-Methods":
-      "GET, POST, OPTIONS"
-  });
+function sendJSON(
+  res,
+  statusCode,
+  data
+) {
+  res.writeHead(
+    statusCode,
+    {
+      "Content-Type":
+        "application/json; charset=utf-8"
+    }
+  );
 
   res.end(
     JSON.stringify(data)
@@ -508,30 +529,45 @@ function sendJson(res, status, data) {
 }
 
 function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = "";
+  return new Promise(
+    (resolve, reject) => {
+      let body = "";
 
-    req.on("data", chunk => {
-      body += chunk;
-    });
+      req.on(
+        "data",
+        chunk => {
+          body += chunk.toString();
+        }
+      );
 
-    req.on("end", () => {
-      if (!body) {
-        resolve({});
-        return;
-      }
+      req.on(
+        "end",
+        () => {
+          if (!body) {
+            resolve({});
+            return;
+          }
 
-      try {
-        resolve(JSON.parse(body));
-      } catch (error) {
-        reject(
-          new Error("Invalid JSON")
-        );
-      }
-    });
+          try {
+            resolve(
+              JSON.parse(body)
+            );
+          } catch (error) {
+            reject(
+              new Error(
+                "Invalid JSON body."
+              )
+            );
+          }
+        }
+      );
 
-    req.on("error", reject);
-  });
+      req.on(
+        "error",
+        reject
+      );
+    }
+  );
 }
 
 /* =========================================================
@@ -541,41 +577,26 @@ function readBody(req) {
 const server = http.createServer(
   async (req, res) => {
     try {
-
-      /* -----------------------------------------
-         CORS
-      ----------------------------------------- */
-
-      if (req.method === "OPTIONS") {
-        sendJson(res, 200, {});
-        return;
-      }
-
-      /* -----------------------------------------
-         TELEGRAM WEBHOOK
-      ----------------------------------------- */
+      /* -------------------------
+         HEALTH
+      ------------------------- */
 
       if (
-        req.method === "POST" &&
-        req.url === "/telegram-webhook"
+        req.method === "GET" &&
+        req.url === "/health"
       ) {
-        const update =
-          await readBody(req);
-
-        await bot.handleUpdate(
-          update
+        return sendJSON(
+          res,
+          200,
+          {
+            status: "ok"
+          }
         );
-
-        sendJson(res, 200, {
-          ok: true
-        });
-
-        return;
       }
 
-      /* -----------------------------------------
+      /* -------------------------
          MINI APP
-      ----------------------------------------- */
+      ------------------------- */
 
       if (
         req.method === "GET" &&
@@ -584,76 +605,104 @@ const server = http.createServer(
           req.url === "/miniapp"
         )
       ) {
-        const filePath =
-          path.join(
-            __dirname,
-            "Miniapp",
-            "index.html"
+        if (
+          !fs.existsSync(
+            MINIAPP_FILE
+          )
+        ) {
+          return sendJSON(
+            res,
+            500,
+            {
+              error:
+                "miniapp/index.html not found",
+              expectedPath:
+                MINIAPP_FILE
+            }
           );
-
-        if (!fs.existsSync(filePath)) {
-          sendJson(res, 404, {
-            error:
-              "Miniapp/index.html not found"
-          });
-
-          return;
         }
 
-        res.writeHead(200, {
-          "Content-Type":
-            "text/html; charset=utf-8"
-        });
+        const html =
+          fs.readFileSync(
+            MINIAPP_FILE,
+            "utf8"
+          );
 
-        fs.createReadStream(
-          filePath
-        ).pipe(res);
+        res.writeHead(
+          200,
+          {
+            "Content-Type":
+              "text/html; charset=utf-8"
+          }
+        );
 
-        return;
+        return res.end(html);
       }
 
-      /* -----------------------------------------
-         HEALTH CHECK
-      ----------------------------------------- */
+      /* -------------------------
+         TELEGRAM WEBHOOK
+      ------------------------- */
 
       if (
-        req.method === "GET" &&
-        req.url === "/health"
+        req.method === "POST" &&
+        req.url ===
+          "/telegram-webhook"
       ) {
-        sendJson(res, 200, {
-          status: "ok"
-        });
+        const update =
+          await readBody(req);
 
-        return;
+        await bot.handleUpdate(
+          update
+        );
+
+        return sendJSON(
+          res,
+          200,
+          {
+            ok: true
+          }
+        );
       }
 
-      /* -----------------------------------------
-         GET 100 CARDS
-      ----------------------------------------- */
+      /* -------------------------
+         GET ALL CARDS
+      ------------------------- */
 
       if (
         req.method === "GET" &&
         req.url === "/api/cards"
       ) {
         const result =
-          await pool.query(`
+          await pool.query(
+            `
             SELECT
               card_number,
               card
             FROM bingo_cards
             ORDER BY card_number
-          `);
+            `
+          );
 
-        sendJson(res, 200, {
-          cards: result.rows
-        });
-
-        return;
+        return sendJSON(
+          res,
+          200,
+          {
+            cards:
+              result.rows.map(
+                row => ({
+                  cardNumber:
+                    row.card_number,
+                  card:
+                    row.card
+                })
+              )
+          }
+        );
       }
 
-      /* -----------------------------------------
+      /* -------------------------
          GET MY CARD
-      ----------------------------------------- */
+      ------------------------- */
 
       if (
         req.method === "GET" &&
@@ -664,7 +713,7 @@ const server = http.createServer(
         const url =
           new URL(
             req.url,
-            `http://${req.headers.host}`
+            RENDER_URL
           );
 
         const initData =
@@ -688,8 +737,8 @@ const server = http.createServer(
               c.card
             FROM players p
             LEFT JOIN bingo_cards c
-              ON p.card_number =
-                 c.card_number
+              ON c.card_number =
+                 p.card_number
             WHERE p.user_id = $1
             `,
             [user.id]
@@ -698,16 +747,22 @@ const server = http.createServer(
         if (
           playerResult.rowCount === 0
         ) {
-          sendJson(res, 404, {
-            error:
-              "Player not found"
-          });
-
-          return;
+          return sendJSON(
+            res,
+            404,
+            {
+              error:
+                "Player not found."
+            }
+          );
         }
 
+        const player =
+          playerResult.rows[0];
+
         const gameResult =
-          await pool.query(`
+          await pool.query(
+            `
             SELECT
               called_numbers,
               winner_user_id,
@@ -715,52 +770,62 @@ const server = http.createServer(
               status
             FROM game_state
             WHERE id = 1
-          `);
-
-        const player =
-          playerResult.rows[0];
+            `
+          );
 
         const game =
           gameResult.rows[0];
 
-        sendJson(res, 200, {
-          playerName: player.name,
-          cardNumber: player.card_number,
-          card: player.card,
-          markedNumbers:
-            player.marked_numbers || [],
-          calledNumbers:
-            game.called_numbers || [],
-          winnerUserId:
-            game.winner_user_id,
-          winnerName:
-            game.winner_name,
-          status:
-            game.status
-        });
-
-        return;
+        return sendJSON(
+          res,
+          200,
+          {
+            userId:
+              player.user_id,
+            name:
+              player.name,
+            cardNumber:
+              player.card_number,
+            card:
+              player.card,
+            markedNumbers:
+              player.marked_numbers,
+            calledNumbers:
+              game.called_numbers,
+            winnerUserId:
+              game.winner_user_id,
+            winnerName:
+              game.winner_name,
+            status:
+              game.status
+          }
+        );
       }
 
-      /* -----------------------------------------
+      /* -------------------------
          SELECT CARD
-      ----------------------------------------- */
+      ------------------------- */
 
       if (
         req.method === "POST" &&
-        req.url === "/api/select-card"
+        req.url ===
+          "/api/select-card"
       ) {
         const body =
           await readBody(req);
 
         const user =
-          authenticateRequest(
-            req,
-            body
+          validateTelegramInitData(
+            getInitDataFromRequest(
+              req,
+              body
+            )
           );
 
         const cardNumber =
-          Number(body.cardNumber);
+          Number(
+            body.cardNumber
+          );
 
         if (
           !Number.isInteger(
@@ -769,20 +834,20 @@ const server = http.createServer(
           cardNumber < 1 ||
           cardNumber > 100
         ) {
-          sendJson(res, 400, {
-            error:
-              "Card number must be between 1 and 100"
-          });
-
-          return;
+          return sendJSON(
+            res,
+            400,
+            {
+              error:
+                "Card number must be between 1 and 100."
+            }
+          );
         }
 
         const cardResult =
           await pool.query(
             `
-            SELECT
-              card_number,
-              card
+            SELECT card_number
             FROM bingo_cards
             WHERE card_number = $1
             `,
@@ -792,12 +857,14 @@ const server = http.createServer(
         if (
           cardResult.rowCount === 0
         ) {
-          sendJson(res, 404, {
-            error:
-              "Card not found"
-          });
-
-          return;
+          return sendJSON(
+            res,
+            404,
+            {
+              error:
+                "Card not found."
+            }
+          );
         }
 
         await pool.query(
@@ -813,7 +880,8 @@ const server = http.createServer(
             ($1, $2, $3, '[]'::jsonb)
           ON CONFLICT (user_id)
           DO UPDATE SET
-            name = EXCLUDED.name,
+            name =
+              EXCLUDED.name,
             card_number =
               EXCLUDED.card_number,
             marked_numbers =
@@ -822,24 +890,25 @@ const server = http.createServer(
           [
             user.id,
             user.first_name ||
+              user.username ||
               "Player",
             cardNumber
           ]
         );
 
-        sendJson(res, 200, {
-          success: true,
-          cardNumber,
-          card:
-            cardResult.rows[0].card
-        });
-
-        return;
+        return sendJSON(
+          res,
+          200,
+          {
+            success: true,
+            cardNumber
+          }
+        );
       }
 
-      /* -----------------------------------------
-         MARK
-      ----------------------------------------- */
+      /* -------------------------
+         MARK NUMBER
+      ------------------------- */
 
       if (
         req.method === "POST" &&
@@ -849,45 +918,59 @@ const server = http.createServer(
           await readBody(req);
 
         const user =
-          authenticateRequest(
-            req,
-            body
+          validateTelegramInitData(
+            getInitDataFromRequest(
+              req,
+              body
+            )
           );
 
         const number =
-          Number(body.number);
+          Number(
+            body.number
+          );
 
         if (
           !Number.isInteger(number) ||
           number < 1 ||
           number > 75
         ) {
-          sendJson(res, 400, {
-            error:
-              "Invalid Bingo number"
-          });
-
-          return;
+          return sendJSON(
+            res,
+            400,
+            {
+              error:
+                "Invalid Bingo number."
+            }
+          );
         }
 
         const gameResult =
-          await pool.query(`
+          await pool.query(
+            `
             SELECT called_numbers
             FROM game_state
             WHERE id = 1
-          `);
+            `
+          );
 
-        const called =
+        const calledNumbers =
           gameResult.rows[0]
-            ?.called_numbers || [];
+            .called_numbers || [];
 
-        if (!called.includes(number)) {
-          sendJson(res, 400, {
-            error:
-              "That number has not been called yet"
-          });
-
-          return;
+        if (
+          !calledNumbers.includes(
+            number
+          )
+        ) {
+          return sendJSON(
+            res,
+            400,
+            {
+              error:
+                "This number has not been called yet."
+            }
+          );
         }
 
         const playerResult =
@@ -903,19 +986,23 @@ const server = http.createServer(
         if (
           playerResult.rowCount === 0
         ) {
-          sendJson(res, 404, {
-            error:
-              "Choose a card first"
-          });
-
-          return;
+          return sendJSON(
+            res,
+            404,
+            {
+              error:
+                "Player not found."
+            }
+          );
         }
 
-        const marked =
+        let marked =
           playerResult.rows[0]
             .marked_numbers || [];
 
-        if (!marked.includes(number)) {
+        if (
+          !marked.includes(number)
+        ) {
           marked.push(number);
         }
 
@@ -931,33 +1018,40 @@ const server = http.createServer(
           ]
         );
 
-        sendJson(res, 200, {
-          success: true,
-          markedNumbers: marked
-        });
-
-        return;
+        return sendJSON(
+          res,
+          200,
+          {
+            success: true,
+            markedNumbers: marked
+          }
+        );
       }
 
-      /* -----------------------------------------
-         UNMARK
-      ----------------------------------------- */
+      /* -------------------------
+         UNMARK NUMBER
+      ------------------------- */
 
       if (
         req.method === "POST" &&
-        req.url === "/api/unmark"
+        req.url ===
+          "/api/unmark"
       ) {
         const body =
           await readBody(req);
 
         const user =
-          authenticateRequest(
-            req,
-            body
+          validateTelegramInitData(
+            getInitDataFromRequest(
+              req,
+              body
+            )
           );
 
         const number =
-          Number(body.number);
+          Number(
+            body.number
+          );
 
         const playerResult =
           await pool.query(
@@ -972,12 +1066,14 @@ const server = http.createServer(
         if (
           playerResult.rowCount === 0
         ) {
-          sendJson(res, 404, {
-            error:
-              "Player not found"
-          });
-
-          return;
+          return sendJSON(
+            res,
+            404,
+            {
+              error:
+                "Player not found."
+            }
+          );
         }
 
         let marked =
@@ -986,7 +1082,7 @@ const server = http.createServer(
 
         marked =
           marked.filter(
-            n => n !== number
+            n => Number(n) !== number
           );
 
         await pool.query(
@@ -1001,29 +1097,34 @@ const server = http.createServer(
           ]
         );
 
-        sendJson(res, 200, {
-          success: true,
-          markedNumbers: marked
-        });
-
-        return;
+        return sendJSON(
+          res,
+          200,
+          {
+            success: true,
+            markedNumbers: marked
+          }
+        );
       }
 
-      /* -----------------------------------------
+      /* -------------------------
          BINGO
-      ----------------------------------------- */
+      ------------------------- */
 
       if (
         req.method === "POST" &&
-        req.url === "/api/bingo"
+        req.url ===
+          "/api/bingo"
       ) {
         const body =
           await readBody(req);
 
         const user =
-          authenticateRequest(
-            req,
-            body
+          validateTelegramInitData(
+            getInitDataFromRequest(
+              req,
+              body
+            )
           );
 
         const client =
@@ -1035,45 +1136,48 @@ const server = http.createServer(
           );
 
           const gameResult =
-            await client.query(`
-              SELECT
-                called_numbers,
-                winner_user_id,
-                winner_name,
-                status
+            await client.query(
+              `
+              SELECT *
               FROM game_state
               WHERE id = 1
               FOR UPDATE
-            `);
+              `
+            );
 
           const game =
             gameResult.rows[0];
 
-          if (game.winner_user_id) {
+          if (
+            game.winner_user_id
+          ) {
             await client.query(
               "ROLLBACK"
             );
 
-            sendJson(res, 200, {
-              bingo: false,
-              message:
-                `Winner already declared: ${game.winner_name}`
-            });
-
-            return;
+            return sendJSON(
+              res,
+              200,
+              {
+                success: false,
+                message:
+                  "There is already a winner."
+              }
+            );
           }
 
           const playerResult =
             await client.query(
               `
               SELECT
+                p.user_id,
                 p.name,
                 p.marked_numbers,
                 c.card
               FROM players p
               JOIN bingo_cards c
-                ON p.card_number =
-                   c.card_number
+                ON c.card_number =
+                   p.card_number
               WHERE p.user_id = $1
               `,
               [user.id]
@@ -1086,35 +1190,129 @@ const server = http.createServer(
               "ROLLBACK"
             );
 
-            sendJson(res, 404, {
-              error:
-                "Choose a card first"
-            });
-
-            return;
+            return sendJSON(
+              res,
+              404,
+              {
+                error:
+                  "Player/card not found."
+              }
+            );
           }
 
           const player =
             playerResult.rows[0];
 
-          const bingo =
-            hasBingo(
-              player.card,
-              player.marked_numbers
+          const marked =
+            player.marked_numbers || [];
+
+          const card =
+            player.card;
+
+          const called =
+            game.called_numbers || [];
+
+          const markedSet =
+            new Set(
+              marked.map(
+                Number
+              )
             );
+
+          let bingo = false;
+
+          for (
+            let row = 0;
+            row < 5;
+            row++
+          ) {
+            let complete = true;
+
+            for (
+              let col = 0;
+              col < 5;
+              col++
+            ) {
+              if (
+                row === 2 &&
+                col === 2
+              ) {
+                continue;
+              }
+
+              const value =
+                Number(
+                  card[row][col]
+                );
+
+              if (
+                !markedSet.has(value)
+              ) {
+                complete = false;
+                break;
+              }
+            }
+
+            if (complete) {
+              bingo = true;
+              break;
+            }
+          }
+
+          if (!bingo) {
+            for (
+              let col = 0;
+              col < 5;
+              col++
+            ) {
+              let complete = true;
+
+              for (
+                let row = 0;
+                row < 5;
+                row++
+              ) {
+                if (
+                  row === 2 &&
+                  col === 2
+                ) {
+                  continue;
+                }
+
+                const value =
+                  Number(
+                    card[row][col]
+                  );
+
+                if (
+                  !markedSet.has(value)
+                ) {
+                  complete = false;
+                  break;
+                }
+              }
+
+              if (complete) {
+                bingo = true;
+                break;
+              }
+            }
+          }
 
           if (!bingo) {
             await client.query(
               "ROLLBACK"
             );
 
-            sendJson(res, 200, {
-              bingo: false,
-              message:
-                "You do not have Bingo yet."
-            });
-
-            return;
+            return sendJSON(
+              res,
+              200,
+              {
+                success: false,
+                message:
+                  "Bingo is not complete."
+              }
+            );
           }
 
           await client.query(
@@ -1136,13 +1334,18 @@ const server = http.createServer(
             "COMMIT"
           );
 
-          sendJson(res, 200, {
-            bingo: true,
-            winner: player.name
-          });
+          return sendJSON(
+            res,
+            200,
+            {
+              success: true,
+              winner: true,
+              message:
+                `BINGO! Congratulations ${player.name}!`
+            }
+          );
 
         } catch (error) {
-
           await client.query(
             "ROLLBACK"
           );
@@ -1150,33 +1353,38 @@ const server = http.createServer(
           throw error;
 
         } finally {
-
           client.release();
         }
-
-        return;
       }
 
-      /* -----------------------------------------
+      /* -------------------------
          404
-      ----------------------------------------- */
+      ------------------------- */
 
-      sendJson(res, 404, {
-        error: "Not found"
-      });
+      return sendJSON(
+        res,
+        404,
+        {
+          error:
+            "Not found."
+        }
+      );
 
     } catch (error) {
-
       console.error(
-        "Request error:",
+        "REQUEST ERROR:",
         error
       );
 
-      sendJson(res, 500, {
-        error:
-          error.message ||
-          "Internal server error"
-      });
+      return sendJSON(
+        res,
+        500,
+        {
+          error:
+            error.message ||
+            "Internal server error."
+        }
+      );
     }
   }
 );
@@ -1187,7 +1395,6 @@ const server = http.createServer(
 
 async function start() {
   try {
-
     await initDatabase();
 
     const webhookUrl =
@@ -1215,11 +1422,14 @@ async function start() {
         console.log(
           `Mini App: ${MINIAPP_URL}`
         );
+
+        console.log(
+          `Mini App file: ${MINIAPP_FILE}`
+        );
       }
     );
 
   } catch (error) {
-
     console.error(
       "STARTUP ERROR:",
       error
@@ -1230,27 +1440,3 @@ async function start() {
 }
 
 start();
-
-/* =========================================================
-   SHUTDOWN
-========================================================= */
-
-process.once(
-  "SIGINT",
-  async () => {
-    await bot.stop();
-    await pool.end();
-    server.close();
-    process.exit(0);
-  }
-);
-
-process.once(
-  "SIGTERM",
-  async () => {
-    await bot.stop();
-    await pool.end();
-    server.close();
-    process.exit(0);
-  }
-);
