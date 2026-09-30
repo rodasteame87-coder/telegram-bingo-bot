@@ -1,146 +1,115 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-  />
+  >
 
-  <title>Telegram Bingo</title>
+  <title>Bingo</title>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <style>
     * {
       box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
     }
 
     body {
       margin: 0;
+      padding: 15px;
       font-family: Arial, sans-serif;
-      background: #10131a;
-      color: white;
-      min-height: 100vh;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 520px;
-      margin: auto;
-      padding: 18px 14px 30px;
+      background: #f4f6f8;
+      color: #222;
     }
 
     h1 {
       text-align: center;
-      margin: 5px 0 6px;
-      font-size: 28px;
+      margin: 5px 0 5px;
     }
 
     .subtitle {
       text-align: center;
-      color: #aeb5c2;
-      margin-bottom: 18px;
-      font-size: 14px;
+      color: #666;
+      margin-bottom: 15px;
     }
 
-    .section-title {
-      font-size: 18px;
-      font-weight: bold;
-      margin: 15px 0 10px;
-    }
-
-    /* CARD NUMBERS */
-
-    .numbers {
+    #cards {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 7px;
+      gap: 8px;
+      max-width: 500px;
+      margin: auto;
     }
 
-    .number {
+    .card-number {
       border: none;
-      border-radius: 9px;
-      background: #242936;
-      color: white;
-      font-size: 15px;
+      border-radius: 10px;
+      padding: 14px 5px;
+      font-size: 16px;
       font-weight: bold;
-      min-height: 42px;
+      background: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.12);
       cursor: pointer;
     }
 
-    .number:active {
-      transform: scale(0.96);
+    .card-number.selected {
+      background: #2196f3;
+      color: white;
     }
 
-    .number.selected {
-      background: #168cff;
-      box-shadow: 0 0 0 2px white inset;
-    }
-
-    /* PREVIEW */
-
-    .preview-box {
-      margin-top: 20px;
-      padding: 14px;
-      border-radius: 15px;
-      background: #191d27;
+    #preview {
       display: none;
+      max-width: 500px;
+      margin: 20px auto;
+      background: white;
+      padding: 12px;
+      border-radius: 15px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.15);
     }
 
-    .preview-title {
+    #preview h2 {
       text-align: center;
-      font-size: 20px;
+      margin: 5px 0 12px;
+    }
+
+    .bingo-board {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #eeeeee;
+      border-radius: 6px;
+      font-size: 15px;
       font-weight: bold;
-      margin-bottom: 12px;
     }
 
-    .bingo-card {
-      width: 100%;
-      max-width: 390px;
-      margin: auto;
-      border-collapse: separate;
-      border-spacing: 4px;
-    }
-
-    .bingo-card th {
-      background: #168cff;
-      border-radius: 7px;
-      height: 38px;
-      font-size: 18px;
-    }
-
-    .bingo-card td {
-      width: 20%;
-      height: 55px;
-      text-align: center;
-      background: #292e39;
-      border-radius: 7px;
-      font-size: 17px;
-      font-weight: bold;
+    .header {
+      background: #333;
+      color: white;
     }
 
     .free {
-      background: #35a853 !important;
-      font-size: 13px !important;
+      background: #4caf50;
+      color: white;
+      font-size: 11px;
     }
-
-    .hint {
-      text-align: center;
-      color: #aeb5c2;
-      font-size: 13px;
-      margin: 12px 0;
-    }
-
-    /* OK BUTTON */
 
     #okButton {
+      display: block;
       width: 100%;
+      margin-top: 15px;
+      padding: 14px;
       border: none;
-      border-radius: 12px;
-      padding: 15px;
-      background: #35a853;
+      border-radius: 10px;
+      background: #2196f3;
       color: white;
       font-size: 18px;
       font-weight: bold;
@@ -148,85 +117,35 @@
     }
 
     #okButton:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
+      background: #aaa;
     }
 
-    .status {
+    #message {
       text-align: center;
-      margin-top: 14px;
-      min-height: 20px;
-      color: #aeb5c2;
-      font-size: 14px;
-    }
-
-    .error {
-      color: #ff6b6b;
-    }
-
-    .success {
-      color: #4ade80;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 20px;
-      color: #aeb5c2;
+      margin: 15px 0;
+      font-weight: bold;
     }
   </style>
 </head>
 
 <body>
 
-<div class="container">
+  <h1>🎱 Bingo</h1>
+  <div class="subtitle">Choose your card</div>
 
-  <h1>🎱 Telegram Bingo</h1>
+  <div id="message">Loading cards...</div>
 
-  <div class="subtitle">
-    Choose your permanent Bingo card
-  </div>
+  <div id="cards"></div>
 
-  <div class="section-title">
-    Choose Card 1–100
-  </div>
+  <div id="preview">
+    <h2 id="previewTitle">Card</h2>
 
-  <div id="numbers" class="numbers">
-    <div class="loading">Loading cards...</div>
-  </div>
-
-  <div id="previewBox" class="preview-box">
-
-    <div id="previewTitle" class="preview-title">
-      Card
-    </div>
-
-    <table class="bingo-card">
-      <thead>
-        <tr>
-          <th>B</th>
-          <th>I</th>
-          <th>N</th>
-          <th>G</th>
-          <th>O</th>
-        </tr>
-      </thead>
-
-      <tbody id="cardBody"></tbody>
-    </table>
-
-    <div class="hint">
-      Check your card and press OK to confirm it.
-    </div>
+    <div id="board" class="bingo-board"></div>
 
     <button id="okButton" disabled>
-      ✅ OK — Choose This Card
+      OK
     </button>
-
   </div>
-
-  <div id="status" class="status"></div>
-
-</div>
 
 <script>
   const tg = window.Telegram.WebApp;
@@ -234,46 +153,22 @@
   tg.ready();
   tg.expand();
 
+  const cardsContainer = document.getElementById("cards");
+  const preview = document.getElementById("preview");
+  const previewTitle = document.getElementById("previewTitle");
+  const board = document.getElementById("board");
+  const okButton = document.getElementById("okButton");
+  const message = document.getElementById("message");
+
   let cards = [];
-  let selectedCardNumber = null;
   let selectedCard = null;
 
-  const numbersContainer =
-    document.getElementById("numbers");
-
-  const previewBox =
-    document.getElementById("previewBox");
-
-  const previewTitle =
-    document.getElementById("previewTitle");
-
-  const cardBody =
-    document.getElementById("cardBody");
-
-  const okButton =
-    document.getElementById("okButton");
-
-  const status =
-    document.getElementById("status");
-
-  /* ==========================================
-     TELEGRAM AUTHENTICATION
-  ========================================== */
-
+  /*
+   * Telegram Mini App authentication data.
+   */
   const initData = tg.initData;
 
-  if (!initData) {
-    showError(
-      "Please open this game from Telegram."
-    );
-  }
-
-  /* ==========================================
-     API
-  ========================================== */
-
-  async function apiRequest(url, options = {}) {
-
+  async function api(url, options = {}) {
     const headers = {
       "Content-Type": "application/json",
       "Authorization": `tma ${initData}`,
@@ -288,286 +183,195 @@
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(
-        data.error || "Request failed"
-      );
+      throw new Error(data.error || "Request failed");
     }
 
     return data;
   }
 
-  /* ==========================================
-     LOAD 100 PERMANENT CARDS
-  ========================================== */
-
+  /*
+   * Load all 100 permanent cards.
+   */
   async function loadCards() {
-
     try {
+      message.textContent = "Loading cards...";
 
-      const data =
-        await apiRequest("/api/cards");
+      const data = await api("/api/cards");
 
       cards = data.cards || [];
 
-      renderNumbers();
+      cardsContainer.innerHTML = "";
 
-      // Load player's previously selected card
+      cards.forEach(card => {
+        const button = document.createElement("button");
+
+        button.className = "card-number";
+        button.textContent = card.cardNumber;
+
+        button.addEventListener("click", () => {
+          selectCard(card.cardNumber);
+        });
+
+        cardsContainer.appendChild(button);
+      });
+
+      message.textContent = "Choose one card from 1–100.";
+
       await loadMyCard();
 
     } catch (error) {
-
       console.error(error);
-
-      showError(
-        "Could not load Bingo cards."
-      );
+      message.textContent = "Error loading cards: " + error.message;
     }
   }
 
-  /* ==========================================
-     NUMBER BUTTONS
-  ========================================== */
-
-  function renderNumbers() {
-
-    numbersContainer.innerHTML = "";
-
-    for (let i = 1; i <= 100; i++) {
-
-      const button =
-        document.createElement("button");
-
-      button.className = "number";
-      button.textContent = i;
-
-      button.addEventListener(
-        "click",
-        () => selectCard(i)
-      );
-
-      numbersContainer.appendChild(button);
-    }
-  }
-
-  /* ==========================================
-     SELECT CARD
-  ========================================== */
-
+  /*
+   * Select a card and show its preview.
+   */
   function selectCard(cardNumber) {
+    selectedCard = cardNumber;
 
-    const found =
-      cards.find(
-        card => Number(card.card_number) === cardNumber
-      );
+    document.querySelectorAll(".card-number").forEach(button => {
+      button.classList.remove("selected");
 
-    if (!found) {
-      showError("Card not found.");
+      if (Number(button.textContent) === cardNumber) {
+        button.classList.add("selected");
+      }
+    });
+
+    const card = cards.find(
+      item => Number(item.cardNumber) === Number(cardNumber)
+    );
+
+    if (!card) {
       return;
     }
 
-    selectedCardNumber = cardNumber;
-    selectedCard = found.card;
-
-    document
-      .querySelectorAll(".number")
-      .forEach(button => {
-        button.classList.toggle(
-          "selected",
-          Number(button.textContent) === cardNumber
-        );
-      });
-
-    showPreview(
-      cardNumber,
-      found.card
-    );
-
-    clearStatus();
-  }
-
-  /* ==========================================
-     SHOW CARD PREVIEW
-  ========================================== */
-
-  function showPreview(
-    cardNumber,
-    card
-  ) {
-
-    previewBox.style.display = "block";
-
-    previewTitle.textContent =
-      `🎯 Bingo Card #${cardNumber}`;
-
-    cardBody.innerHTML = "";
-
-    for (let row = 0; row < 5; row++) {
-
-      const tr =
-        document.createElement("tr");
-
-      for (let col = 0; col < 5; col++) {
-
-        const td =
-          document.createElement("td");
-
-        const value =
-          card[row][col];
-
-        td.textContent = value;
-
-        if (value === "FREE") {
-          td.classList.add("free");
-        }
-
-        tr.appendChild(td);
-      }
-
-      cardBody.appendChild(tr);
-    }
+    showPreview(card);
 
     okButton.disabled = false;
+  }
 
-    previewBox.scrollIntoView({
+  /*
+   * Display the 5x5 Bingo board.
+   */
+  function showPreview(card) {
+    preview.style.display = "block";
+
+    previewTitle.textContent = `Card #${card.cardNumber}`;
+
+    board.innerHTML = "";
+
+    const headers = ["B", "I", "N", "G", "O"];
+
+    headers.forEach(letter => {
+      const cell = document.createElement("div");
+
+      cell.className = "cell header";
+      cell.textContent = letter;
+
+      board.appendChild(cell);
+    });
+
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 5; col++) {
+
+        const cell = document.createElement("div");
+        cell.className = "cell";
+
+        if (row === 2 && col === 2) {
+          cell.classList.add("free");
+          cell.textContent = "FREE";
+        } else {
+          const value = card.card[row][col];
+          cell.textContent = value;
+        }
+
+        board.appendChild(cell);
+      }
+    }
+
+    preview.scrollIntoView({
       behavior: "smooth",
       block: "center"
     });
   }
 
-  /* ==========================================
-     CONFIRM CARD
-  ========================================== */
+  /*
+   * Confirm selected card.
+   */
+  okButton.addEventListener("click", async () => {
 
-  okButton.addEventListener(
-    "click",
-    async () => {
+    if (!selectedCard) {
+      return;
+    }
 
-      if (!selectedCardNumber) {
+    try {
+      okButton.disabled = true;
+      okButton.textContent = "Saving...";
+
+      const data = await api("/api/select-card", {
+        method: "POST",
+        body: JSON.stringify({
+          initData: initData,
+          cardNumber: selectedCard
+        })
+      });
+
+      message.textContent =
+        `✅ Card #${data.cardNumber} selected successfully.`;
+
+      okButton.textContent = "Selected ✓";
+
+      /*
+       * Keep the preview visible.
+       * Actual Bingo gameplay will be added next.
+       */
+
+    } catch (error) {
+      console.error(error);
+
+      message.textContent =
+        "Error selecting card: " + error.message;
+
+      okButton.disabled = false;
+      okButton.textContent = "OK";
+    }
+  });
+
+  /*
+   * Restore player's previously selected card.
+   */
+  async function loadMyCard() {
+    try {
+
+      if (!initData) {
+        message.textContent =
+          "Please open this page from the Telegram bot.";
+
         return;
       }
 
-      okButton.disabled = true;
-      okButton.textContent =
-        "⏳ Saving...";
+      const data = await api(
+        `/api/my-card?initData=${encodeURIComponent(initData)}`
+      );
 
-      clearStatus();
+      if (data.cardNumber) {
+        selectCard(Number(data.cardNumber));
 
-      try {
-
-        const result =
-          await apiRequest(
-            "/api/select-card",
-            {
-              method: "POST",
-              body: JSON.stringify({
-                initData,
-                cardNumber: selectedCardNumber
-              })
-            }
-          );
-
-        if (result.success) {
-
-          showSuccess(
-            `✅ Card #${selectedCardNumber} selected successfully!`
-          );
-
-          okButton.textContent =
-            "✅ Card Selected";
-
-          /*
-             The actual Bingo game screen
-             will be connected here next.
-          */
-
-        }
-
-      } catch (error) {
-
-        console.error(error);
-
-        showError(
-          error.message ||
-          "Could not save your card."
-        );
-
-        okButton.disabled = false;
-
-        okButton.textContent =
-          "✅ OK — Choose This Card";
-      }
-    }
-  );
-
-  /* ==========================================
-     LOAD PLAYER'S CURRENT CARD
-  ========================================== */
-
-  async function loadMyCard() {
-
-    try {
-
-      const data =
-        await apiRequest(
-          "/api/my-card?initData=" +
-          encodeURIComponent(initData)
-        );
-
-      if (
-        data.cardNumber &&
-        data.card
-      ) {
-
-        selectCard(
-          Number(data.cardNumber)
-        );
-
-        okButton.textContent =
-          "✅ Card Already Selected";
-
-        okButton.disabled = false;
+        message.textContent =
+          `Your selected card is #${data.cardNumber}.`;
       }
 
     } catch (error) {
-
-      // New players won't have a card yet.
-      console.log(
-        "No previously selected card."
-      );
+      console.log("No previous card:", error.message);
     }
   }
 
-  /* ==========================================
-     STATUS
-  ========================================== */
-
-  function showError(message) {
-
-    status.textContent = message;
-    status.className =
-      "status error";
-  }
-
-  function showSuccess(message) {
-
-    status.textContent = message;
-    status.className =
-      "status success";
-  }
-
-  function clearStatus() {
-
-    status.textContent = "";
-    status.className =
-      "status";
-  }
-
-  /* ==========================================
-     START
-  ========================================== */
-
+  /*
+   * Start.
+   */
   loadCards();
-
 </script>
 
 </body>
