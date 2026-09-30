@@ -180,9 +180,9 @@ button.main-button {
 }
 
 .current-number {
-  font-size: 48px;
+  font-size: 56px;
   font-weight: bold;
-  margin: 5px 0;
+  margin: 8px 0 12px;
 }
 
 .called-history {
@@ -190,7 +190,7 @@ button.main-button {
   flex-wrap: wrap;
   gap: 5px;
   justify-content: center;
-  max-height: 100px;
+  max-height: 120px;
   overflow-y: auto;
 }
 
@@ -199,6 +199,12 @@ button.main-button {
   border-radius: 7px;
   padding: 5px 8px;
   font-size: 13px;
+}
+
+.called-history span.latest {
+  background: #16a34a;
+  font-size: 15px;
+  font-weight: bold;
 }
 
 .my-card-title {
@@ -440,12 +446,11 @@ let currentGameId = null;
 let currentGameStatus = "waiting";
 
 let appStarted = false;
-
 let gamePolling = null;
 
 
 /* =====================================================
-   TELEGRAM USER DATA
+   TELEGRAM
 ===================================================== */
 
 function getInitData() {
@@ -459,11 +464,6 @@ function getInitData() {
 }
 
 
-/*
- * IMPORTANT:
- * Get the Telegram user's real ID.
- */
-
 function getUserId() {
 
   if (
@@ -472,9 +472,7 @@ function getUserId() {
     !tg.initDataUnsafe.user ||
     !tg.initDataUnsafe.user.id
   ) {
-
     return null;
-
   }
 
   return Number(
@@ -483,11 +481,6 @@ function getUserId() {
 
 }
 
-
-/*
- * Make sure the Mini App was opened
- * from Telegram.
- */
 
 function requireUserId() {
 
@@ -508,7 +501,7 @@ function requireUserId() {
 
 
 /* =====================================================
-   API HELPER
+   API
 ===================================================== */
 
 async function api(url, options = {}) {
@@ -609,11 +602,9 @@ function showScreen(id) {
 
   document
     .querySelectorAll(".screen")
-    .forEach(
-      screen => {
-        screen.classList.remove("active");
-      }
-    );
+    .forEach(screen => {
+      screen.classList.remove("active");
+    });
 
   const screen =
     document.getElementById(id);
@@ -638,20 +629,13 @@ function normalizeBoard(board) {
   if (typeof board === "string") {
 
     try {
-
-      board =
-        JSON.parse(board);
-
+      board = JSON.parse(board);
     } catch {
-
       return null;
-
     }
 
   }
 
-
-  /* 5 x 5 ARRAY */
 
   if (Array.isArray(board)) {
 
@@ -659,19 +643,13 @@ function normalizeBoard(board) {
       return null;
     }
 
-    for (
-      let r = 0;
-      r < 5;
-      r++
-    ) {
+    for (let r = 0; r < 5; r++) {
 
       if (
         !Array.isArray(board[r]) ||
         board[r].length !== 5
       ) {
-
         return null;
-
       }
 
     }
@@ -680,8 +658,6 @@ function normalizeBoard(board) {
 
   }
 
-
-  /* B I N G O COLUMNS */
 
   if (
     typeof board === "object" &&
@@ -701,9 +677,7 @@ function normalizeBoard(board) {
       !Array.isArray(G) ||
       !Array.isArray(O)
     ) {
-
       return null;
-
     }
 
     if (
@@ -713,9 +687,7 @@ function normalizeBoard(board) {
       G.length !== 5 ||
       O.length !== 5
     ) {
-
       return null;
-
     }
 
     return [
@@ -740,7 +712,7 @@ function normalizeBoard(board) {
 
 
 /* =====================================================
-   LOAD CARD NUMBERS
+   LOAD CARDS
 ===================================================== */
 
 async function loadCards() {
@@ -764,9 +736,7 @@ async function loadCards() {
       );
 
     currentGameId =
-      Number(
-        data.gameId || 0
-      );
+      Number(data.gameId || 0);
 
     document.getElementById(
       "selectionGame"
@@ -775,9 +745,7 @@ async function loadCards() {
 
 
     const usedCards =
-      Array.isArray(
-        data.usedCards
-      )
+      Array.isArray(data.usedCards)
       ? data.usedCards.map(Number)
       : [];
 
@@ -796,9 +764,7 @@ async function loadCards() {
     ) {
 
       const button =
-        document.createElement(
-          "button"
-        );
+        document.createElement("button");
 
       button.className =
         "card-number";
@@ -820,9 +786,7 @@ async function loadCards() {
 
 
         const owner =
-          usedBy[
-            String(number)
-          ];
+          usedBy[String(number)];
 
 
         if (
@@ -844,10 +808,7 @@ async function loadCards() {
 
       }
 
-
-      grid.appendChild(
-        button
-      );
+      grid.appendChild(button);
 
     }
 
@@ -865,47 +826,13 @@ async function loadCards() {
       "Could not load cards."
     );
 
-
-    /*
-     * Still show numbers
-     * so user can retry.
-     */
-
-    for (
-      let number = 1;
-      number <= 100;
-      number++
-    ) {
-
-      const button =
-        document.createElement(
-          "button"
-        );
-
-      button.className =
-        "card-number";
-
-      button.textContent =
-        number;
-
-      button.addEventListener(
-        "click",
-        () => previewCard(number)
-      );
-
-      grid.appendChild(
-        button
-      );
-
-    }
-
   }
 
 }
 
 
 /* =====================================================
-   DIRECT CARD
+   GET ONE CARD
 ===================================================== */
 
 async function getCard(number) {
@@ -914,12 +841,6 @@ async function getCard(number) {
     await api(
       `/api/card?number=${encodeURIComponent(number)}&_=${Date.now()}`
     );
-
-
-  console.log(
-    "CARD RESPONSE:",
-    data
-  );
 
 
   if (
@@ -957,7 +878,7 @@ async function getCard(number) {
 
 
 /* =====================================================
-   PREVIEW
+   PREVIEW CARD
 ===================================================== */
 
 async function previewCard(number) {
@@ -1088,12 +1009,10 @@ function cancelSelection() {
   selectedCardNumber = null;
   selectedBoard = null;
 
-
   document.getElementById(
     "previewBox"
   ).style.display =
     "none";
-
 
   clearError();
 
@@ -1118,9 +1037,7 @@ async function confirmCard() {
 
 
   const number =
-    Number(
-      selectedCardNumber
-    );
+    Number(selectedCardNumber);
 
 
   const button =
@@ -1141,31 +1058,14 @@ async function confirmCard() {
 
   try {
 
-    /*
-     * Get Telegram User ID.
-     */
-
     const userId =
       requireUserId();
-
-
-    console.log(
-      "TELEGRAM USER ID:",
-      userId
-    );
-
-
-    console.log(
-      "SELECTING CARD:",
-      number
-    );
 
 
     const data =
       await api(
         "/api/select-card",
         {
-
           method: "POST",
 
           body: JSON.stringify({
@@ -1183,12 +1083,6 @@ async function confirmCard() {
 
         }
       );
-
-
-    console.log(
-      "SELECT RESPONSE:",
-      data
-    );
 
 
     if (
@@ -1239,7 +1133,6 @@ async function confirmCard() {
 
 
     markedNumbers = [];
-
     calledNumbers = [];
 
 
@@ -1277,22 +1170,6 @@ async function confirmCard() {
       "🏆 BINGO";
 
 
-    document.getElementById(
-      "gameNumber"
-    ).textContent =
-      `Game ${currentGameId}`;
-
-
-    document.getElementById(
-      "gameStatus"
-    ).textContent =
-      "Game is running";
-
-
-    /*
-     * Go directly to game.
-     */
-
     showScreen(
       "gameScreen"
     );
@@ -1302,19 +1179,13 @@ async function confirmCard() {
 
 
     /*
-     * Update game state in background.
+     * IMPORTANT:
+     * Immediately get the current called
+     * number instead of waiting for the
+     * next 1-second polling cycle.
      */
 
-    updateGameState().catch(
-      error => {
-
-        console.log(
-          "BACKGROUND GAME UPDATE:",
-          error
-        );
-
-      }
-    );
+    await updateGameState();
 
 
   } catch (error) {
@@ -1360,12 +1231,6 @@ async function loadMyCard() {
       await api(
         `/api/my-card?initData=${encodeURIComponent(getInitData())}&userId=${encodeURIComponent(userId)}&_=${Date.now()}`
       );
-
-
-    console.log(
-      "MY CARD:",
-      data
-    );
 
 
     if (
@@ -1415,9 +1280,7 @@ async function loadMyCard() {
 
 
     myCardNumber =
-      Number(
-        data.cardNumber
-      );
+      Number(data.cardNumber);
 
 
     myBoard =
@@ -1425,9 +1288,7 @@ async function loadMyCard() {
 
 
     markedNumbers =
-      Array.isArray(
-        data.markedNumbers
-      )
+      Array.isArray(data.markedNumbers)
       ? data.markedNumbers.map(Number)
       : [];
 
@@ -1447,7 +1308,6 @@ async function loadMyCard() {
 
     renderMyBoard();
 
-
   } catch (error) {
 
     console.log(
@@ -1465,11 +1325,6 @@ async function loadMyCard() {
       "selectionScreen"
     );
 
-
-    /*
-     * If Telegram User ID is missing,
-     * show a clear message.
-     */
 
     if (
       error.message &&
@@ -1520,23 +1375,17 @@ function createBoardHtml(
 
   let html = `
     <table class="bingo-board ${
-      playable
-      ? "play-board"
-      : ""
+      playable ? "play-board" : ""
     }">
 
     <thead>
-
       <tr>
-
         <th>B</th>
         <th>I</th>
         <th>N</th>
         <th>G</th>
         <th>O</th>
-
       </tr>
-
     </thead>
 
     <tbody>
@@ -1549,8 +1398,7 @@ function createBoardHtml(
     row++
   ) {
 
-    html +=
-      "<tr>";
+    html += "<tr>";
 
 
     for (
@@ -1577,8 +1425,7 @@ function createBoardHtml(
 
       if (free) {
 
-        classes +=
-          " free";
+        classes += " free";
 
       }
 
@@ -1590,8 +1437,7 @@ function createBoardHtml(
         markedNumbers.includes(numeric)
       ) {
 
-        classes +=
-          " marked";
+        classes += " marked";
 
       } else if (
         playable &&
@@ -1600,8 +1446,7 @@ function createBoardHtml(
         calledNumbers.includes(numeric)
       ) {
 
-        classes +=
-          " called";
+        classes += " called";
 
       }
 
@@ -1637,8 +1482,7 @@ function createBoardHtml(
     }
 
 
-    html +=
-      "</tr>";
+    html += "</tr>";
 
   }
 
@@ -1655,7 +1499,7 @@ function createBoardHtml(
 
 
 /* =====================================================
-   RENDER BOARD
+   RENDER MY BOARD
 ===================================================== */
 
 function renderMyBoard() {
@@ -1695,18 +1539,14 @@ async function toggleMark(number) {
   if (
     currentGameStatus !== "playing"
   ) {
-
     return;
-
   }
 
 
   if (
     !calledNumbers.includes(number)
   ) {
-
     return;
-
   }
 
 
@@ -1730,7 +1570,6 @@ async function toggleMark(number) {
       await api(
         endpoint,
         {
-
           method: "POST",
 
           body: JSON.stringify({
@@ -1763,7 +1602,6 @@ async function toggleMark(number) {
 
 
     renderMyBoard();
-
 
   } catch (error) {
 
@@ -1812,7 +1650,6 @@ async function claimBingo() {
   button.disabled =
     true;
 
-
   button.textContent =
     "Checking...";
 
@@ -1830,7 +1667,6 @@ async function claimBingo() {
       await api(
         "/api/bingo",
         {
-
           method: "POST",
 
           body: JSON.stringify({
@@ -1852,13 +1688,8 @@ async function claimBingo() {
     ) {
 
       showWinner(
-
-        data.winnerName ||
-        "You",
-
-        data.winnerCardNumber ||
-        myCardNumber
-
+        data.winnerName || "You",
+        data.winnerCardNumber || myCardNumber
       );
 
       return;
@@ -1875,10 +1706,8 @@ async function claimBingo() {
     button.disabled =
       false;
 
-
     button.textContent =
       "🏆 BINGO";
-
 
   } catch (error) {
 
@@ -1890,7 +1719,6 @@ async function claimBingo() {
 
     button.disabled =
       false;
-
 
     button.textContent =
       "🏆 BINGO";
@@ -2025,12 +1853,63 @@ function showGameOver(
 
 
 /* =====================================================
+   NO WINNER
+===================================================== */
+
+function showNoWinner() {
+
+  currentGameStatus =
+    "finished";
+
+
+  document.getElementById(
+    "gameStatus"
+  ).textContent =
+    "Game finished";
+
+
+  document.getElementById(
+    "resultArea"
+  ).innerHTML = `
+
+    <div class="result-box gameover-box">
+
+      <div class="result-title">
+        GAME OVER
+      </div>
+
+      <div class="result-text">
+
+        All 75 numbers were called.
+
+        <br>
+
+        No Bingo winner this game.
+
+        <br><br>
+
+        Better luck next time! 🍀
+
+      </div>
+
+    </div>
+
+  `;
+
+
+  document.getElementById(
+    "bingoButton"
+  ).style.display =
+    "none";
+
+}
+
+
+/* =====================================================
    RESET FOR NEW GAME
 ===================================================== */
 
-async function resetForNewGame(
-  gameId
-) {
+async function resetForNewGame(gameId) {
 
   currentGameId =
     Number(gameId);
@@ -2043,10 +1922,8 @@ async function resetForNewGame(
   selectedCardNumber = null;
   selectedBoard = null;
 
-
   myCardNumber = null;
   myBoard = null;
-
 
   calledNumbers = [];
   markedNumbers = [];
@@ -2105,7 +1982,7 @@ async function resetForNewGame(
 
 
 /* =====================================================
-   GAME STATE
+   GET GAME STATE
 ===================================================== */
 
 async function getGameState() {
@@ -2152,7 +2029,7 @@ async function updateGameState() {
 
 
     /*
-     * New game detected.
+     * Detect a new game.
      */
 
     if (
@@ -2184,11 +2061,17 @@ async function updateGameState() {
       "waiting";
 
 
+    /*
+     * Get all called numbers.
+     */
+
     calledNumbers =
       Array.isArray(
         data.calledNumbers
       )
-      ? data.calledNumbers.map(Number)
+      ? data.calledNumbers
+          .map(Number)
+          .filter(Number.isFinite)
       : [];
 
 
@@ -2204,11 +2087,68 @@ async function updateGameState() {
       `Game ${newGameId}`;
 
 
+    /*
+     * IMPORTANT FIX:
+     *
+     * The server currently gives us:
+     *
+     * calledNumbers: [55, 56, 30, ...]
+     *
+     * It does not necessarily give:
+     *
+     * currentNumber
+     *
+     * Therefore the latest number in
+     * calledNumbers is the current number.
+     */
+
+    let currentNumber = null;
+
+
+    if (
+      calledNumbers.length > 0
+    ) {
+
+      currentNumber =
+        calledNumbers[
+          calledNumbers.length - 1
+        ];
+
+    }
+
+
+    /*
+     * If server ever sends currentNumber,
+     * use it instead.
+     */
+
+    if (
+      data.currentNumber !== undefined &&
+      data.currentNumber !== null &&
+      data.currentNumber !== ""
+    ) {
+
+      const serverCurrent =
+        Number(data.currentNumber);
+
+
+      if (
+        Number.isFinite(serverCurrent)
+      ) {
+
+        currentNumber =
+          serverCurrent;
+
+      }
+
+    }
+
+
     document.getElementById(
       "currentNumber"
     ).textContent =
-      data.currentNumber
-      ? Number(data.currentNumber)
+      currentNumber !== null
+      ? currentNumber
       : "-";
 
 
@@ -2228,6 +2168,11 @@ async function updateGameState() {
       ).textContent =
         "Game is running";
 
+
+      /*
+       * If the user already has a card,
+       * keep the game screen open.
+       */
 
       if (
         myCardNumber &&
@@ -2258,13 +2203,43 @@ async function updateGameState() {
 
       const winnerName =
         data.winnerName ||
-        "Another player";
+        (
+          data.winner &&
+          data.winner.name
+        );
 
 
       const winnerCard =
         data.winnerCardNumber ||
-        "?";
+        (
+          data.winner &&
+          data.winner.cardNumber
+        );
 
+
+      /*
+       * No winner.
+       */
+
+      if (
+        !winnerName &&
+        !winnerCard
+      ) {
+
+        if (myCardNumber) {
+
+          showNoWinner();
+
+        }
+
+        return;
+
+      }
+
+
+      /*
+       * We have a winner.
+       */
 
       if (
         myCardNumber &&
@@ -2318,12 +2293,16 @@ function renderCalledHistory() {
     "";
 
 
+  /*
+   * Show newest first.
+   */
+
   [
     ...calledNumbers
   ]
   .reverse()
   .forEach(
-    number => {
+    (number, index) => {
 
       const span =
         document.createElement(
@@ -2333,6 +2312,22 @@ function renderCalledHistory() {
 
       span.textContent =
         number;
+
+
+      /*
+       * Highlight the newest
+       * called number.
+       */
+
+      if (
+        index === 0
+      ) {
+
+        span.classList.add(
+          "latest"
+        );
+
+      }
 
 
       history.appendChild(
@@ -2382,10 +2377,6 @@ async function start() {
     true;
 
 
-  /*
-   * Verify Telegram user.
-   */
-
   try {
 
     const userId =
@@ -2409,7 +2400,7 @@ async function start() {
 
 
   /*
-   * Initial game state.
+   * Get initial game state.
    */
 
   try {
@@ -2427,6 +2418,38 @@ async function start() {
     currentGameStatus =
       state.status ||
       "waiting";
+
+
+    /*
+     * Immediately load called numbers
+     * before loading the card.
+     */
+
+    calledNumbers =
+      Array.isArray(
+        state.calledNumbers
+      )
+      ? state.calledNumbers.map(Number)
+      : [];
+
+
+    const firstCurrent =
+      calledNumbers.length
+      ? calledNumbers[
+          calledNumbers.length - 1
+        ]
+      : null;
+
+
+    document.getElementById(
+      "currentNumber"
+    ).textContent =
+      firstCurrent !== null
+      ? firstCurrent
+      : "-";
+
+
+    renderCalledHistory();
 
   } catch (error) {
 
@@ -2446,7 +2469,7 @@ async function start() {
 
 
   /*
-   * Update game.
+   * Immediately synchronize again.
    */
 
   await updateGameState();
