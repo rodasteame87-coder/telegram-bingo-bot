@@ -445,7 +445,7 @@ let gamePolling = null;
 
 
 /* =====================================================
-   INIT DATA
+   TELEGRAM USER DATA
 ===================================================== */
 
 function getInitData() {
@@ -455,6 +455,54 @@ function getInitData() {
   }
 
   return tg.initData || "";
+
+}
+
+
+/*
+ * IMPORTANT:
+ * Get the Telegram user's real ID.
+ */
+
+function getUserId() {
+
+  if (
+    !tg ||
+    !tg.initDataUnsafe ||
+    !tg.initDataUnsafe.user ||
+    !tg.initDataUnsafe.user.id
+  ) {
+
+    return null;
+
+  }
+
+  return Number(
+    tg.initDataUnsafe.user.id
+  );
+
+}
+
+
+/*
+ * Make sure the Mini App was opened
+ * from Telegram.
+ */
+
+function requireUserId() {
+
+  const userId =
+    getUserId();
+
+  if (!userId) {
+
+    throw new Error(
+      "Telegram User ID is missing. Please open the Bingo game from Telegram."
+    );
+
+  }
+
+  return userId;
 
 }
 
@@ -476,16 +524,24 @@ async function api(url, options = {}) {
   };
 
   const response =
-    await fetch(url, requestOptions);
+    await fetch(
+      url,
+      requestOptions
+    );
 
   let data;
 
   try {
-    data = await response.json();
+
+    data =
+      await response.json();
+
   } catch {
+
     throw new Error(
       "Invalid server response."
     );
+
   }
 
   if (!response.ok) {
@@ -582,15 +638,20 @@ function normalizeBoard(board) {
   if (typeof board === "string") {
 
     try {
-      board = JSON.parse(board);
+
+      board =
+        JSON.parse(board);
+
     } catch {
+
       return null;
+
     }
 
   }
 
 
-  /* 5 x 5 array */
+  /* 5 x 5 ARRAY */
 
   if (Array.isArray(board)) {
 
@@ -620,7 +681,7 @@ function normalizeBoard(board) {
   }
 
 
-  /* B I N G O columns */
+  /* B I N G O COLUMNS */
 
   if (
     typeof board === "object" &&
@@ -660,9 +721,13 @@ function normalizeBoard(board) {
     return [
 
       [B[0], I[0], N[0], G[0], O[0]],
+
       [B[1], I[1], N[1], G[1], O[1]],
+
       [B[2], I[2], N[2], G[2], O[2]],
+
       [B[3], I[3], N[3], G[3], O[3]],
+
       [B[4], I[4], N[4], G[4], O[4]]
 
     ];
@@ -699,7 +764,9 @@ async function loadCards() {
       );
 
     currentGameId =
-      Number(data.gameId || 0);
+      Number(
+        data.gameId || 0
+      );
 
     document.getElementById(
       "selectionGame"
@@ -708,14 +775,19 @@ async function loadCards() {
 
 
     const usedCards =
-      Array.isArray(data.usedCards)
+      Array.isArray(
+        data.usedCards
+      )
       ? data.usedCards.map(Number)
       : [];
+
 
     const usedBy =
       data.usedBy || {};
 
+
     grid.innerHTML = "";
+
 
     for (
       let number = 1;
@@ -724,13 +796,16 @@ async function loadCards() {
     ) {
 
       const button =
-        document.createElement("button");
+        document.createElement(
+          "button"
+        );
 
       button.className =
         "card-number";
 
       button.textContent =
         number;
+
 
       if (
         usedCards.includes(number)
@@ -740,10 +815,15 @@ async function loadCards() {
           "unavailable"
         );
 
-        button.disabled = true;
+        button.disabled =
+          true;
+
 
         const owner =
-          usedBy[String(number)];
+          usedBy[
+            String(number)
+          ];
+
 
         if (
           owner &&
@@ -764,7 +844,10 @@ async function loadCards() {
 
       }
 
-      grid.appendChild(button);
+
+      grid.appendChild(
+        button
+      );
 
     }
 
@@ -782,9 +865,10 @@ async function loadCards() {
       "Could not load cards."
     );
 
+
     /*
-     * Still display the numbers so the
-     * user can retry.
+     * Still show numbers
+     * so user can retry.
      */
 
     for (
@@ -794,7 +878,9 @@ async function loadCards() {
     ) {
 
       const button =
-        document.createElement("button");
+        document.createElement(
+          "button"
+        );
 
       button.className =
         "card-number";
@@ -807,7 +893,9 @@ async function loadCards() {
         () => previewCard(number)
       );
 
-      grid.appendChild(button);
+      grid.appendChild(
+        button
+      );
 
     }
 
@@ -827,10 +915,12 @@ async function getCard(number) {
       `/api/card?number=${encodeURIComponent(number)}&_=${Date.now()}`
     );
 
+
   console.log(
     "CARD RESPONSE:",
     data
   );
+
 
   if (
     data.success !== true
@@ -843,9 +933,11 @@ async function getCard(number) {
 
   }
 
+
   const board =
     normalizeBoard(data.board) ||
     normalizeBoard(data.card);
+
 
   if (!board) {
 
@@ -854,6 +946,7 @@ async function getCard(number) {
     );
 
   }
+
 
   return {
     ...data,
@@ -874,18 +967,22 @@ async function previewCard(number) {
   selectedCardNumber = null;
   selectedBoard = null;
 
+
   const previewBox =
     document.getElementById(
       "previewBox"
     );
 
+
   previewBox.style.display =
     "block";
+
 
   document.getElementById(
     "previewTitle"
   ).textContent =
     `Loading Card #${number}...`;
+
 
   document.getElementById(
     "previewBoard"
@@ -895,10 +992,12 @@ async function previewCard(number) {
     </div>
   `;
 
+
   try {
 
     const data =
       await getCard(number);
+
 
     currentGameId =
       Number(
@@ -906,6 +1005,7 @@ async function previewCard(number) {
         currentGameId ||
         0
       );
+
 
     if (
       data.available === false
@@ -915,6 +1015,7 @@ async function previewCard(number) {
         data.takenBy &&
         data.takenBy.name;
 
+
       throw new Error(
         owner
         ? `Card #${number} is already taken by ${owner}.`
@@ -923,18 +1024,23 @@ async function previewCard(number) {
 
     }
 
+
     selectedCardNumber =
       Number(
-        data.cardNumber || number
+        data.cardNumber ||
+        number
       );
+
 
     selectedBoard =
       data.board;
+
 
     document.getElementById(
       "previewTitle"
     ).textContent =
       `Card #${selectedCardNumber}`;
+
 
     document.getElementById(
       "previewBoard"
@@ -944,10 +1050,12 @@ async function previewCard(number) {
         false
       );
 
+
     previewBox.scrollIntoView({
       behavior: "smooth",
       block: "start"
     });
+
 
   } catch (error) {
 
@@ -956,8 +1064,10 @@ async function previewCard(number) {
       error
     );
 
+
     previewBox.style.display =
       "none";
+
 
     showError(
       error.message ||
@@ -978,10 +1088,12 @@ function cancelSelection() {
   selectedCardNumber = null;
   selectedBoard = null;
 
+
   document.getElementById(
     "previewBox"
   ).style.display =
     "none";
+
 
   clearError();
 
@@ -1004,37 +1116,65 @@ async function confirmCard() {
 
   }
 
+
   const number =
-    Number(selectedCardNumber);
+    Number(
+      selectedCardNumber
+    );
+
 
   const button =
     document.getElementById(
       "confirmButton"
     );
 
-  button.disabled = true;
+
+  button.disabled =
+    true;
+
   button.textContent =
     "Selecting...";
 
+
   clearError();
 
+
   try {
+
+    /*
+     * Get Telegram User ID.
+     */
+
+    const userId =
+      requireUserId();
+
+
+    console.log(
+      "TELEGRAM USER ID:",
+      userId
+    );
+
 
     console.log(
       "SELECTING CARD:",
       number
     );
 
+
     const data =
       await api(
         "/api/select-card",
         {
+
           method: "POST",
 
           body: JSON.stringify({
 
             initData:
               getInitData(),
+
+            userId:
+              userId,
 
             cardNumber:
               number
@@ -1043,6 +1183,7 @@ async function confirmCard() {
 
         }
       );
+
 
     console.log(
       "SELECT RESPONSE:",
@@ -1063,16 +1204,11 @@ async function confirmCard() {
     }
 
 
-    /*
-     * Get board from server response.
-     * If server does not include it,
-     * use the preview board.
-     */
-
     const board =
       normalizeBoard(data.board) ||
       normalizeBoard(data.card) ||
       normalizeBoard(selectedBoard);
+
 
     if (!board) {
 
@@ -1083,18 +1219,16 @@ async function confirmCard() {
     }
 
 
-    /*
-     * SAVE PLAYER STATE
-     */
-
     myCardNumber =
       Number(
         data.cardNumber ||
         number
       );
 
+
     myBoard =
       board;
+
 
     currentGameId =
       Number(
@@ -1102,6 +1236,7 @@ async function confirmCard() {
         currentGameId ||
         0
       );
+
 
     markedNumbers = [];
 
@@ -1112,33 +1247,29 @@ async function confirmCard() {
     selectedBoard = null;
 
 
-    /*
-     * CLEAR PREVIEW
-     */
-
     document.getElementById(
       "previewBox"
     ).style.display =
       "none";
 
 
-    /*
-     * PREPARE GAME SCREEN
-     */
-
     document.getElementById(
       "resultArea"
-    ).innerHTML = "";
+    ).innerHTML =
+      "";
+
 
     document.getElementById(
       "bingoButton"
     ).style.display =
       "block";
 
+
     document.getElementById(
       "bingoButton"
     ).disabled =
       false;
+
 
     document.getElementById(
       "bingoButton"
@@ -1151,6 +1282,7 @@ async function confirmCard() {
     ).textContent =
       `Game ${currentGameId}`;
 
+
     document.getElementById(
       "gameStatus"
     ).textContent =
@@ -1158,35 +1290,32 @@ async function confirmCard() {
 
 
     /*
-     * IMPORTANT:
-     *
-     * SHOW GAME IMMEDIATELY.
-     *
-     * We do NOT wait for the game
-     * state request here.
+     * Go directly to game.
      */
 
     showScreen(
       "gameScreen"
     );
 
+
     renderMyBoard();
 
 
     /*
-     * Now update numbers in background.
-     *
-     * This cannot block the OK button.
+     * Update game state in background.
      */
 
     updateGameState().catch(
       error => {
+
         console.log(
           "BACKGROUND GAME UPDATE:",
           error
         );
+
       }
     );
+
 
   } catch (error) {
 
@@ -1195,14 +1324,17 @@ async function confirmCard() {
       error
     );
 
+
     showError(
       error.message ||
       "Could not select Bingo card."
     );
 
+
   } finally {
 
-    button.disabled = false;
+    button.disabled =
+      false;
 
     button.textContent =
       "OK";
@@ -1220,15 +1352,21 @@ async function loadMyCard() {
 
   try {
 
+    const userId =
+      requireUserId();
+
+
     const data =
       await api(
-        `/api/my-card?initData=${encodeURIComponent(getInitData())}&_=${Date.now()}`
+        `/api/my-card?initData=${encodeURIComponent(getInitData())}&userId=${encodeURIComponent(userId)}&_=${Date.now()}`
       );
+
 
     console.log(
       "MY CARD:",
       data
     );
+
 
     if (
       !data ||
@@ -1239,9 +1377,11 @@ async function loadMyCard() {
       myBoard = null;
       markedNumbers = [];
 
+
       showScreen(
         "selectionScreen"
       );
+
 
       await loadCards();
 
@@ -1254,15 +1394,18 @@ async function loadMyCard() {
       normalizeBoard(data.board) ||
       normalizeBoard(data.card);
 
+
     if (!board) {
 
       myCardNumber = null;
       myBoard = null;
       markedNumbers = [];
 
+
       showScreen(
         "selectionScreen"
       );
+
 
       await loadCards();
 
@@ -1272,15 +1415,22 @@ async function loadMyCard() {
 
 
     myCardNumber =
-      Number(data.cardNumber);
+      Number(
+        data.cardNumber
+      );
+
 
     myBoard =
       board;
 
+
     markedNumbers =
-      Array.isArray(data.markedNumbers)
+      Array.isArray(
+        data.markedNumbers
+      )
       ? data.markedNumbers.map(Number)
       : [];
+
 
     currentGameId =
       Number(
@@ -1294,7 +1444,9 @@ async function loadMyCard() {
       "gameScreen"
     );
 
+
     renderMyBoard();
+
 
   } catch (error) {
 
@@ -1303,13 +1455,37 @@ async function loadMyCard() {
       error
     );
 
+
     myCardNumber = null;
     myBoard = null;
     markedNumbers = [];
 
+
     showScreen(
       "selectionScreen"
     );
+
+
+    /*
+     * If Telegram User ID is missing,
+     * show a clear message.
+     */
+
+    if (
+      error.message &&
+      error.message.includes(
+        "Telegram User ID is missing"
+      )
+    ) {
+
+      showError(
+        error.message
+      );
+
+      return;
+
+    }
+
 
     await loadCards();
 
@@ -1330,6 +1506,7 @@ function createBoardHtml(
   board =
     normalizeBoard(board);
 
+
   if (!board) {
 
     return `
@@ -1340,6 +1517,7 @@ function createBoardHtml(
 
   }
 
+
   let html = `
     <table class="bingo-board ${
       playable
@@ -1348,13 +1526,17 @@ function createBoardHtml(
     }">
 
     <thead>
+
       <tr>
+
         <th>B</th>
         <th>I</th>
         <th>N</th>
         <th>G</th>
         <th>O</th>
+
       </tr>
+
     </thead>
 
     <tbody>
@@ -1367,7 +1549,8 @@ function createBoardHtml(
     row++
   ) {
 
-    html += "<tr>";
+    html +=
+      "<tr>";
 
 
     for (
@@ -1379,19 +1562,23 @@ function createBoardHtml(
       const value =
         board[row][col];
 
+
       const free =
         row === 2 &&
         col === 2;
 
+
       const numeric =
         Number(value);
+
 
       let classes = "";
 
 
       if (free) {
 
-        classes += " free";
+        classes +=
+          " free";
 
       }
 
@@ -1403,7 +1590,8 @@ function createBoardHtml(
         markedNumbers.includes(numeric)
       ) {
 
-        classes += " marked";
+        classes +=
+          " marked";
 
       } else if (
         playable &&
@@ -1412,7 +1600,8 @@ function createBoardHtml(
         calledNumbers.includes(numeric)
       ) {
 
-        classes += " called";
+        classes +=
+          " called";
 
       }
 
@@ -1448,7 +1637,8 @@ function createBoardHtml(
     }
 
 
-    html += "</tr>";
+    html +=
+      "</tr>";
 
   }
 
@@ -1457,6 +1647,7 @@ function createBoardHtml(
     </tbody>
     </table>
   `;
+
 
   return html;
 
@@ -1473,10 +1664,12 @@ function renderMyBoard() {
     return;
   }
 
+
   document.getElementById(
     "myCardTitle"
   ).textContent =
     `My Card #${myCardNumber}`;
+
 
   document.getElementById(
     "gameBoard"
@@ -1498,6 +1691,7 @@ async function toggleMark(number) {
   number =
     Number(number);
 
+
   if (
     currentGameStatus !== "playing"
   ) {
@@ -1505,6 +1699,7 @@ async function toggleMark(number) {
     return;
 
   }
+
 
   if (
     !calledNumbers.includes(number)
@@ -1521,6 +1716,10 @@ async function toggleMark(number) {
 
   try {
 
+    const userId =
+      requireUserId();
+
+
     const endpoint =
       already
       ? "/api/unmark"
@@ -1531,6 +1730,7 @@ async function toggleMark(number) {
       await api(
         endpoint,
         {
+
           method: "POST",
 
           body: JSON.stringify({
@@ -1538,7 +1738,11 @@ async function toggleMark(number) {
             initData:
               getInitData(),
 
-            number
+            userId:
+              userId,
+
+            number:
+              number
 
           })
 
@@ -1559,6 +1763,7 @@ async function toggleMark(number) {
 
 
     renderMyBoard();
+
 
   } catch (error) {
 
@@ -1603,26 +1808,38 @@ async function claimBingo() {
       "bingoButton"
     );
 
-  button.disabled = true;
+
+  button.disabled =
+    true;
+
 
   button.textContent =
     "Checking...";
+
 
   clearError();
 
 
   try {
 
+    const userId =
+      requireUserId();
+
+
     const data =
       await api(
         "/api/bingo",
         {
+
           method: "POST",
 
           body: JSON.stringify({
 
             initData:
-              getInitData()
+              getInitData(),
+
+            userId:
+              userId
 
           })
 
@@ -1635,11 +1852,13 @@ async function claimBingo() {
     ) {
 
       showWinner(
+
         data.winnerName ||
         "You",
 
         data.winnerCardNumber ||
         myCardNumber
+
       );
 
       return;
@@ -1656,8 +1875,10 @@ async function claimBingo() {
     button.disabled =
       false;
 
+
     button.textContent =
       "🏆 BINGO";
+
 
   } catch (error) {
 
@@ -1666,8 +1887,10 @@ async function claimBingo() {
       "Could not check Bingo."
     );
 
+
     button.disabled =
       false;
+
 
     button.textContent =
       "🏆 BINGO";
@@ -1688,6 +1911,7 @@ function showWinner(
 
   currentGameStatus =
     "finished";
+
 
   document.getElementById(
     "gameStatus"
@@ -1750,6 +1974,7 @@ function showGameOver(
   currentGameStatus =
     "finished";
 
+
   document.getElementById(
     "gameStatus"
   ).textContent =
@@ -1810,14 +2035,18 @@ async function resetForNewGame(
   currentGameId =
     Number(gameId);
 
+
   currentGameStatus =
     "playing";
+
 
   selectedCardNumber = null;
   selectedBoard = null;
 
+
   myCardNumber = null;
   myBoard = null;
+
 
   calledNumbers = [];
   markedNumbers = [];
@@ -1828,30 +2057,36 @@ async function resetForNewGame(
   ).textContent =
     "-";
 
+
   document.getElementById(
     "calledHistory"
   ).innerHTML =
     "";
+
 
   document.getElementById(
     "gameBoard"
   ).innerHTML =
     "";
 
+
   document.getElementById(
     "resultArea"
   ).innerHTML =
     "";
+
 
   document.getElementById(
     "bingoButton"
   ).style.display =
     "block";
 
+
   document.getElementById(
     "bingoButton"
   ).disabled =
     false;
+
 
   document.getElementById(
     "bingoButton"
@@ -1875,12 +2110,6 @@ async function resetForNewGame(
 
 async function getGameState() {
 
-  /*
-   * Your current server uses /api/game.
-   *
-   * We try that first.
-   */
-
   try {
 
     return await api(
@@ -1894,9 +2123,6 @@ async function getGameState() {
       firstError
     );
 
-    /*
-     * Compatibility with an older server.
-     */
 
     return await api(
       `/api/game-state?_=${Date.now()}`
@@ -1926,7 +2152,7 @@ async function updateGameState() {
 
 
     /*
-     * Detect new game.
+     * New game detected.
      */
 
     if (
@@ -2008,11 +2234,6 @@ async function updateGameState() {
         myBoard
       ) {
 
-        /*
-         * Don't interrupt the game
-         * screen if player already has card.
-         */
-
         showScreen(
           "gameScreen"
         );
@@ -2038,6 +2259,7 @@ async function updateGameState() {
       const winnerName =
         data.winnerName ||
         "Another player";
+
 
       const winnerCard =
         data.winnerCardNumber ||
@@ -2070,11 +2292,6 @@ async function updateGameState() {
 
   } catch (error) {
 
-    /*
-     * Do not freeze the app if
-     * game-state temporarily fails.
-     */
-
     console.log(
       "GAME STATE ERROR:",
       error
@@ -2096,6 +2313,7 @@ function renderCalledHistory() {
       "calledHistory"
     );
 
+
   history.innerHTML =
     "";
 
@@ -2112,8 +2330,10 @@ function renderCalledHistory() {
           "span"
         );
 
+
       span.textContent =
         number;
+
 
       history.appendChild(
         span
@@ -2130,11 +2350,6 @@ function renderCalledHistory() {
 ===================================================== */
 
 async function poll() {
-
-  /*
-   * Never let polling block
-   * the interface.
-   */
 
   try {
 
@@ -2162,11 +2377,39 @@ async function start() {
     return;
   }
 
-  appStarted = true;
+
+  appStarted =
+    true;
 
 
   /*
-   * Get initial game state.
+   * Verify Telegram user.
+   */
+
+  try {
+
+    const userId =
+      requireUserId();
+
+
+    console.log(
+      "BINGO TELEGRAM USER ID:",
+      userId
+    );
+
+  } catch (error) {
+
+    showError(
+      error.message
+    );
+
+    return;
+
+  }
+
+
+  /*
+   * Initial game state.
    */
 
   try {
@@ -2174,10 +2417,12 @@ async function start() {
     const state =
       await getGameState();
 
+
     currentGameId =
       Number(
         state.gameId || 0
       );
+
 
     currentGameStatus =
       state.status ||
@@ -2194,15 +2439,14 @@ async function start() {
 
 
   /*
-   * Check if this user already
-   * has a card in the current game.
+   * Check existing card.
    */
 
   await loadMyCard();
 
 
   /*
-   * Update numbers.
+   * Update game.
    */
 
   await updateGameState();
