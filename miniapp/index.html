@@ -558,6 +558,11 @@ function normalizeBoard(board) {
     return null;
   }
 
+  /*
+   * If the server sends JSON text,
+   * convert it to an object first.
+   */
+
   if (typeof board === "string") {
 
     try {
@@ -568,26 +573,161 @@ function normalizeBoard(board) {
 
   }
 
-  if (!Array.isArray(board)) {
-    return null;
-  }
 
-  if (board.length !== 5) {
-    return null;
-  }
+  /*
+   * FORMAT 1:
+   *
+   * [
+   *   [B,I,N,G,O],
+   *   [B,I,N,G,O],
+   *   ...
+   * ]
+   */
 
-  for (let r = 0; r < 5; r++) {
+  if (Array.isArray(board)) {
 
-    if (
-      !Array.isArray(board[r]) ||
-      board[r].length !== 5
-    ) {
+    if (board.length !== 5) {
       return null;
     }
 
+    for (let r = 0; r < 5; r++) {
+
+      if (
+        !Array.isArray(board[r]) ||
+        board[r].length !== 5
+      ) {
+        return null;
+      }
+
+    }
+
+    return board;
+
   }
 
-  return board;
+
+  /*
+   * FORMAT 2:
+   *
+   * {
+   *   B: [...],
+   *   I: [...],
+   *   N: [...],
+   *   G: [...],
+   *   O: [...]
+   * }
+   *
+   * This is the format your server
+   * is currently returning.
+   */
+
+  if (
+    typeof board === "object" &&
+    board !== null
+  ) {
+
+    const B =
+      Array.isArray(board.B)
+      ? board.B
+      : null;
+
+    const I =
+      Array.isArray(board.I)
+      ? board.I
+      : null;
+
+    const N =
+      Array.isArray(board.N)
+      ? board.N
+      : null;
+
+    const G =
+      Array.isArray(board.G)
+      ? board.G
+      : null;
+
+    const O =
+      Array.isArray(board.O)
+      ? board.O
+      : null;
+
+    if (
+      !B ||
+      !I ||
+      !N ||
+      !G ||
+      !O
+    ) {
+
+      return null;
+
+    }
+
+    if (
+      B.length !== 5 ||
+      I.length !== 5 ||
+      N.length !== 5 ||
+      G.length !== 5 ||
+      O.length !== 5
+    ) {
+
+      return null;
+
+    }
+
+
+    /*
+     * Convert columns into rows.
+     */
+
+    return [
+
+      [
+        B[0],
+        I[0],
+        N[0],
+        G[0],
+        O[0]
+      ],
+
+      [
+        B[1],
+        I[1],
+        N[1],
+        G[1],
+        O[1]
+      ],
+
+      [
+        B[2],
+        I[2],
+        N[2],
+        G[2],
+        O[2]
+      ],
+
+      [
+        B[3],
+        I[3],
+        N[3],
+        G[3],
+        O[3]
+      ],
+
+      [
+        B[4],
+        I[4],
+        N[4],
+        G[4],
+        O[4]
+      ]
+
+    ];
+
+  }
+
+
+  return null;
 
 }
 
@@ -668,8 +808,10 @@ async function loadCards() {
           owner &&
           owner.name
         ) {
+
           button.title =
             `Taken by ${owner.name}`;
+
         }
 
       } else {
@@ -698,10 +840,6 @@ async function loadCards() {
       error.message ||
       "Could not load cards."
     );
-
-    /*
-     * Keep the 1–100 buttons visible.
-     */
 
     for (
       let number = 1;
@@ -758,6 +896,13 @@ async function getCard(number) {
     );
 
   }
+
+  /*
+   * IMPORTANT:
+   *
+   * normalizeBoard() now understands
+   * the server's B/I/N/G/O format.
+   */
 
   const board =
     normalizeBoard(data.board) ||
@@ -819,12 +964,11 @@ async function previewCard(number) {
       await getCard(number);
 
     currentGameId =
-      Number(data.gameId || currentGameId || 0);
-
-    /*
-     * Check whether another player
-     * already has this card.
-     */
+      Number(
+        data.gameId ||
+        currentGameId ||
+        0
+      );
 
     if (
       data.available === false
@@ -930,7 +1074,8 @@ async function confirmCard() {
     );
 
   button.disabled = true;
-  button.textContent = "Selecting...";
+  button.textContent =
+    "Selecting...";
 
   clearError();
 
@@ -941,12 +1086,15 @@ async function confirmCard() {
         "/api/select-card",
         {
           method: "POST",
+
           body: JSON.stringify({
             initData:
               getInitData(),
+
             cardNumber:
               number
           })
+
         }
       );
 
@@ -1002,7 +1150,8 @@ async function confirmCard() {
 
     document.getElementById(
       "previewBox"
-    ).style.display = "none";
+    ).style.display =
+      "none";
 
     document.getElementById(
       "resultArea"
@@ -1010,18 +1159,22 @@ async function confirmCard() {
 
     document.getElementById(
       "bingoButton"
-    ).style.display = "block";
+    ).style.display =
+      "block";
 
     document.getElementById(
       "bingoButton"
-    ).disabled = false;
+    ).disabled =
+      false;
 
     document.getElementById(
       "bingoButton"
     ).textContent =
       "🏆 BINGO";
 
-    showScreen("gameScreen");
+    showScreen(
+      "gameScreen"
+    );
 
     renderMyBoard();
 
@@ -1044,7 +1197,8 @@ async function confirmCard() {
   } finally {
 
     button.disabled = false;
-    button.textContent = "OK";
+    button.textContent =
+      "OK";
 
   }
 
@@ -1323,7 +1477,8 @@ function renderMyBoard() {
 
 async function toggleMark(number) {
 
-  number = Number(number);
+  number =
+    Number(number);
 
   if (
     currentGameStatus !== "playing"
@@ -1352,11 +1507,14 @@ async function toggleMark(number) {
         endpoint,
         {
           method: "POST",
+
           body: JSON.stringify({
             initData:
               getInitData(),
+
             number
           })
+
         }
       );
 
@@ -1404,7 +1562,9 @@ async function claimBingo() {
   if (
     currentGameStatus !== "playing"
   ) {
+
     return;
+
   }
 
   const button =
@@ -1425,10 +1585,12 @@ async function claimBingo() {
         "/api/bingo",
         {
           method: "POST",
+
           body: JSON.stringify({
             initData:
               getInitData()
           })
+
         }
       );
 
@@ -1437,7 +1599,9 @@ async function claimBingo() {
     ) {
 
       showWinner(
-        data.winnerName || "You",
+        data.winnerName ||
+        "You",
+
         data.winnerCardNumber ||
         myCardNumber
       );
@@ -1451,7 +1615,9 @@ async function claimBingo() {
       "Bingo is not valid yet."
     );
 
-    button.disabled = false;
+    button.disabled =
+      false;
+
     button.textContent =
       "🏆 BINGO";
 
@@ -1462,7 +1628,9 @@ async function claimBingo() {
       "Could not check Bingo."
     );
 
-    button.disabled = false;
+    button.disabled =
+      false;
+
     button.textContent =
       "🏆 BINGO";
 
@@ -1614,27 +1782,33 @@ async function resetForNewGame(
 
   document.getElementById(
     "currentNumber"
-  ).textContent = "-";
+  ).textContent =
+    "-";
 
   document.getElementById(
     "calledHistory"
-  ).innerHTML = "";
+  ).innerHTML =
+    "";
 
   document.getElementById(
     "gameBoard"
-  ).innerHTML = "";
+  ).innerHTML =
+    "";
 
   document.getElementById(
     "resultArea"
-  ).innerHTML = "";
+  ).innerHTML =
+    "";
 
   document.getElementById(
     "bingoButton"
-  ).style.display = "block";
+  ).style.display =
+    "block";
 
   document.getElementById(
     "bingoButton"
-  ).disabled = false;
+  ).disabled =
+    false;
 
   document.getElementById(
     "bingoButton"
@@ -1675,8 +1849,9 @@ async function updateGameState() {
 
     }
 
+
     /*
-     * New game detected.
+     * Detect new game.
      */
 
     if (
@@ -1692,6 +1867,7 @@ async function updateGameState() {
 
     }
 
+
     currentGameStatus =
       data.status ||
       "waiting";
@@ -1703,6 +1879,7 @@ async function updateGameState() {
       ? data.calledNumbers.map(Number)
       : [];
 
+
     document.getElementById(
       "gameNumber"
     ).textContent =
@@ -1713,6 +1890,7 @@ async function updateGameState() {
     ).textContent =
       `Game ${newGameId}`;
 
+
     document.getElementById(
       "currentNumber"
     ).textContent =
@@ -1720,7 +1898,9 @@ async function updateGameState() {
       ? Number(data.currentNumber)
       : "-";
 
+
     renderCalledHistory();
+
 
     if (
       data.status === "playing"
@@ -1730,6 +1910,7 @@ async function updateGameState() {
         "gameStatus"
       ).textContent =
         "Game is running";
+
 
       if (
         myCardNumber &&
@@ -1760,6 +1941,7 @@ async function updateGameState() {
       const winnerCard =
         data.winnerCardNumber ||
         "?";
+
 
       if (
         myCardNumber &&
@@ -1806,7 +1988,8 @@ function renderCalledHistory() {
       "calledHistory"
     );
 
-  history.innerHTML = "";
+  history.innerHTML =
+    "";
 
   [
     ...calledNumbers
@@ -1881,9 +2064,11 @@ async function start() {
 
   }
 
+
   await loadMyCard();
 
   await updateGameState();
+
 
   setInterval(
     poll,
