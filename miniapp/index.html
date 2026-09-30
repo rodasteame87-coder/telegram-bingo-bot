@@ -1,8 +1,18 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Telegram Bingo</title>  <script src="https://telegram.org/js/telegram-web-app.js"></script>  <style>
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  >
+
+  <title>Telegram Bingo</title>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
     * {
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
@@ -235,102 +245,123 @@
       color: #666;
       word-break: break-word;
     }
-  </style></head><body><div class="container">  <h1>🎱 Telegram Bingo</h1>  <div id="loading" class="loading">
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>🎱 Telegram Bingo</h1>
+
+  <div id="loading" class="loading">
     Loading your bingo card...
-  </div>  <div id="error" class="error" style="display:none;"></div>  <div id="game" style="display:none;"><div class="info">
-
-  <div class="info-row">
-    <span class="label">Player</span>
-    <span class="value" id="playerName">-</span>
   </div>
 
-  <div class="info-row">
-    <span class="label">Host</span>
-    <span class="value" id="hostName">-</span>
-  </div>
+  <div id="error" class="error" style="display:none;"></div>
 
-  <div class="info-row">
-    <span class="label">Players</span>
-    <span class="value" id="playerCount">-</span>
-  </div>
+  <div id="game" style="display:none;">
 
-  <div class="info-row">
-    <span class="label">Called</span>
-    <span class="value" id="calledCount">0/75</span>
-  </div>
+    <div class="info">
 
-</div>
+      <div class="info-row">
+        <span class="label">Player</span>
+        <span class="value" id="playerName">-</span>
+      </div>
 
-<div class="last-called">
+      <div class="info-row">
+        <span class="label">Host</span>
+        <span class="value" id="hostName">-</span>
+      </div>
 
-  <div class="last-called-title">
-    Last Called Number
-  </div>
+      <div class="info-row">
+        <span class="label">Players</span>
+        <span class="value" id="playerCount">-</span>
+      </div>
 
-  <div class="last-number" id="lastCalled">
-    —
-  </div>
+      <div class="info-row">
+        <span class="label">Called</span>
+        <span class="value" id="calledCount">0/75</span>
+      </div>
 
-</div>
-
-<div class="called-box">
-
-  <div class="called-title">
-    🎱 All Called Numbers
-  </div>
-
-  <div id="calledNumbers" class="called-list">
-    <div class="no-called">
-      No numbers called yet
     </div>
+
+    <div class="last-called">
+
+      <div class="last-called-title">
+        Last Called Number
+      </div>
+
+      <div class="last-number" id="lastCalled">
+        —
+      </div>
+
+    </div>
+
+    <div class="called-box">
+
+      <div class="called-title">
+        🎱 All Called Numbers
+      </div>
+
+      <div id="calledNumbers" class="called-list">
+        <div class="no-called">
+          No numbers called yet
+        </div>
+      </div>
+
+    </div>
+
+    <div class="board">
+
+      <div class="bingo-header">
+        <div>B</div>
+        <div>I</div>
+        <div>N</div>
+        <div>G</div>
+        <div>O</div>
+      </div>
+
+      <div id="board" class="grid"></div>
+
+      <button id="bingoButton" class="bingo-button">
+        🎉 BINGO!
+      </button>
+
+      <div id="message" class="message"></div>
+
+    </div>
+
+    <div class="legend">
+
+      <div class="legend-item">
+        <div class="legend-box legend-called"></div>
+        Called number
+      </div>
+
+      <div class="legend-item">
+        <div class="legend-box legend-marked"></div>
+        Your marked number
+      </div>
+
+      <div class="legend-item">
+        <div class="legend-box legend-free"></div>
+        FREE space
+      </div>
+
+    </div>
+
   </div>
 
 </div>
 
-<div class="board">
+<script>
 
-  <div class="bingo-header">
-    <div>B</div>
-    <div>I</div>
-    <div>N</div>
-    <div>G</div>
-    <div>O</div>
-  </div>
-
-  <div id="board" class="grid"></div>
-
-  <button id="bingoButton" class="bingo-button">
-    🎉 BINGO!
-  </button>
-
-  <div id="message" class="message"></div>
-
-</div>
-
-<div class="legend">
-
-  <div class="legend-item">
-    <div class="legend-box legend-called"></div>
-    Called number
-  </div>
-
-  <div class="legend-item">
-    <div class="legend-box legend-marked"></div>
-    Your marked number
-  </div>
-
-  <div class="legend-item">
-    <div class="legend-box legend-free"></div>
-    FREE space
-  </div>
-
-</div>
-
-  </div></div><script>
-
-const tg = window.Telegram && window.Telegram.WebApp
-  ? window.Telegram.WebApp
-  : null;
+const tg =
+  window.Telegram &&
+  window.Telegram.WebApp
+    ? window.Telegram.WebApp
+    : null;
 
 if (tg) {
   tg.ready();
@@ -343,11 +374,10 @@ let cardData = null;
 let userId = null;
 let chatId = null;
 
-/*
-====================================================
-GET TELEGRAM USER
-====================================================
-*/
+
+/* ==================================================
+   GET TELEGRAM USER
+================================================== */
 
 function getUserId() {
 
@@ -360,7 +390,8 @@ function getUserId() {
     return String(tg.initDataUnsafe.user.id);
   }
 
-  const params = new URLSearchParams(window.location.search);
+  const params =
+    new URLSearchParams(window.location.search);
 
   return (
     params.get("userId") ||
@@ -371,20 +402,17 @@ function getUserId() {
 }
 
 
-/*
-====================================================
-GET GAME / CHAT ID
-====================================================
-*/
+/* ==================================================
+   GET GAME ID
+================================================== */
 
 function getGameId() {
 
-  const params =
-    new URLSearchParams(window.location.search);
-
   /*
-    Telegram Mini App start parameter
-  */
+   * FIRST:
+   * Telegram officially provides startapp
+   * through initDataUnsafe.start_param
+   */
 
   if (
     tg &&
@@ -392,163 +420,288 @@ function getGameId() {
     tg.initDataUnsafe.start_param
   ) {
 
-    const value =
-      tg.initDataUnsafe.start_param;
-
-    if (value) {
-      return String(value);
-    }
+    return String(
+      tg.initDataUnsafe.start_param
+    );
   }
 
+
   /*
-    URL parameters
-  */
+   * SECOND:
+   * Check Telegram's URL parameter
+   */
+
+  const params =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  const telegramStartParam =
+    params.get("tgWebAppStartParam");
+
+  if (telegramStartParam) {
+
+    return String(
+      telegramStartParam
+    );
+  }
+
+
+  /*
+   * THIRD:
+   * Check normal URL parameters
+   */
 
   const possibleNames = [
+
     "chatId",
     "chat_id",
+
     "gameId",
     "game_id",
+
     "startapp",
     "start_param",
     "start"
+
   ];
 
-  for (const name of possibleNames) {
+  for (
+    const name of possibleNames
+  ) {
 
-    const value = params.get(name);
+    const value =
+      params.get(name);
 
     if (value) {
+
       return String(value);
     }
   }
 
+
   /*
-    Telegram sometimes places the parameter
-    after ?startapp=
-  */
+   * FOURTH:
+   * Some Telegram Mini App versions
+   * can place data in the URL hash.
+   */
+
+  const hash =
+    window.location.hash || "";
+
+  if (hash) {
+
+    const hashText =
+      hash.startsWith("#")
+        ? hash.substring(1)
+        : hash;
+
+    const hashParams =
+      new URLSearchParams(hashText);
+
+    const hashStart =
+      hashParams.get(
+        "tgWebAppStartParam"
+      );
+
+    if (hashStart) {
+
+      return String(hashStart);
+    }
+  }
+
+
+  /*
+   * FIFTH:
+   * Search the complete URL as a final fallback.
+   */
 
   const currentUrl =
     window.location.href;
 
   const match =
     currentUrl.match(
-      /(?:chatId|chat_id|gameId|game_id|startapp|start_param|start)=([^&]+)/i
+      /(?:tgWebAppStartParam|startapp|start_param|gameId|game_id|chatId|chat_id)=([^&#]+)/i
     );
 
-  if (match && match[1]) {
-    return decodeURIComponent(match[1]);
+  if (
+    match &&
+    match[1]
+  ) {
+
+    try {
+
+      return decodeURIComponent(
+        match[1]
+      );
+
+    } catch (e) {
+
+      return match[1];
+    }
   }
+
 
   return null;
 }
 
 
+/* ==================================================
+   INITIAL USER / GAME
+================================================== */
+
 userId = getUserId();
 chatId = getGameId();
 
 
-/*
-====================================================
-ERROR
-====================================================
-*/
+/* ==================================================
+   ERROR
+================================================== */
 
 function showError(message) {
 
-  document.getElementById("loading").style.display =
-    "none";
+  document.getElementById(
+    "loading"
+  ).style.display = "none";
 
-  document.getElementById("game").style.display =
-    "none";
+  document.getElementById(
+    "game"
+  ).style.display = "none";
 
   const box =
-    document.getElementById("error");
+    document.getElementById(
+      "error"
+    );
 
   box.style.display = "block";
 
   box.innerHTML =
     message +
     '<div class="debug">' +
+
     "Telegram user: " +
-    (userId ? "OK" : "missing") +
+    (
+      userId
+        ? "OK"
+        : "missing"
+    ) +
+
     "<br>" +
+
     "Game ID: " +
-    (chatId ? "OK" : "missing") +
+    (
+      chatId
+        ? "OK (" +
+          escapeHtml(chatId) +
+          ")"
+        : "missing"
+    ) +
+
     "</div>";
 }
 
 
-/*
-====================================================
-MESSAGE
-====================================================
-*/
+/* ==================================================
+   SAFE HTML
+================================================== */
+
+function escapeHtml(value) {
+
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+
+/* ==================================================
+   MESSAGE
+================================================== */
 
 function showMessage(message) {
 
   const box =
-    document.getElementById("message");
+    document.getElementById(
+      "message"
+    );
 
   box.textContent = message;
 
-  setTimeout(function() {
-    box.textContent = "";
-  }, 3500);
+  setTimeout(
+    function() {
+
+      box.textContent = "";
+
+    },
+    3500
+  );
 }
 
 
-/*
-====================================================
-CALLED NUMBERS
-====================================================
-*/
+/* ==================================================
+   CALLED NUMBERS
+================================================== */
 
 function renderCalledNumbers(numbers) {
 
   const container =
-    document.getElementById("calledNumbers");
+    document.getElementById(
+      "calledNumbers"
+    );
 
   container.innerHTML = "";
 
-  if (!Array.isArray(numbers) || numbers.length === 0) {
+  if (
+    !Array.isArray(numbers) ||
+    numbers.length === 0
+  ) {
 
     container.innerHTML =
-      '<div class="no-called">No numbers called yet</div>';
+      '<div class="no-called">' +
+      'No numbers called yet' +
+      '</div>';
 
     return;
   }
 
-  numbers.forEach(function(number) {
+  numbers.forEach(
+    function(number) {
 
-    const item =
-      document.createElement("div");
+      const item =
+        document.createElement(
+          "div"
+        );
 
-    item.className =
-      "called-number";
+      item.className =
+        "called-number";
 
-    item.textContent =
-      number;
+      item.textContent =
+        number;
 
-    container.appendChild(item);
+      container.appendChild(
+        item
+      );
 
-  });
+    }
+  );
 
   container.scrollTop =
     container.scrollHeight;
 }
 
 
-/*
-====================================================
-BOARD
-====================================================
-*/
+/* ==================================================
+   BOARD
+================================================== */
 
 function renderBoard() {
 
   const board =
-    document.getElementById("board");
+    document.getElementById(
+      "board"
+    );
 
   board.innerHTML = "";
 
@@ -556,38 +709,61 @@ function renderBoard() {
     !cardData ||
     !Array.isArray(cardData.card)
   ) {
+
     return;
   }
 
   const calledNumbers =
-    Array.isArray(cardData.calledNumbers)
+    Array.isArray(
+      cardData.calledNumbers
+    )
       ? cardData.calledNumbers
       : [];
 
   const markedNumbers =
-    Array.isArray(cardData.markedNumbers)
+    Array.isArray(
+      cardData.markedNumbers
+    )
       ? cardData.markedNumbers
       : [];
 
   const card =
     cardData.card;
 
-  for (let row = 0; row < 5; row++) {
+  for (
+    let row = 0;
+    row < 5;
+    row++
+  ) {
 
-    for (let col = 0; col < 5; col++) {
+    for (
+      let col = 0;
+      col < 5;
+      col++
+    ) {
 
       const cell =
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
 
-      cell.className = "cell";
+      cell.className =
+        "cell";
 
       const value =
         card[row][col];
 
-      if (row === 2 && col === 2) {
+      if (
+        row === 2 &&
+        col === 2
+      ) {
 
-        cell.classList.add("free");
-        cell.textContent = "FREE";
+        cell.classList.add(
+          "free"
+        );
+
+        cell.textContent =
+          "FREE";
 
       } else {
 
@@ -596,16 +772,26 @@ function renderBoard() {
 
         if (
           calledNumbers.includes(value) ||
-          calledNumbers.includes(Number(value))
+          calledNumbers.includes(
+            Number(value)
+          )
         ) {
-          cell.classList.add("called");
+
+          cell.classList.add(
+            "called"
+          );
         }
 
         if (
           markedNumbers.includes(value) ||
-          markedNumbers.includes(Number(value))
+          markedNumbers.includes(
+            Number(value)
+          )
         ) {
-          cell.classList.add("marked");
+
+          cell.classList.add(
+            "marked"
+          );
         }
 
         cell.addEventListener(
@@ -614,7 +800,9 @@ function renderBoard() {
 
             if (
               !calledNumbers.includes(value) &&
-              !calledNumbers.includes(Number(value))
+              !calledNumbers.includes(
+                Number(value)
+              )
             ) {
 
               showMessage(
@@ -625,37 +813,49 @@ function renderBoard() {
             }
 
             toggleMark(value);
+
           }
         );
       }
 
-      board.appendChild(cell);
+      board.appendChild(
+        cell
+      );
     }
   }
 }
 
 
-/*
-====================================================
-MARK / UNMARK
-====================================================
-*/
+/* ==================================================
+   MARK / UNMARK
+================================================== */
 
 async function toggleMark(value) {
 
-  if (!chatId || !userId) {
-    showMessage("Game or player information is missing.");
+  if (
+    !chatId ||
+    !userId
+  ) {
+
+    showMessage(
+      "Game or player information is missing."
+    );
+
     return;
   }
 
   const marked =
-    Array.isArray(cardData.markedNumbers)
+    Array.isArray(
+      cardData.markedNumbers
+    )
       ? cardData.markedNumbers
       : [];
 
   const isMarked =
     marked.includes(value) ||
-    marked.includes(Number(value));
+    marked.includes(
+      Number(value)
+    );
 
   const endpoint =
     isMarked
@@ -666,17 +866,27 @@ async function toggleMark(value) {
 
     const response =
       await fetch(
-        API_BASE + endpoint,
+        API_BASE +
+        endpoint,
         {
           method: "POST",
+
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type":
+              "application/json"
           },
-          body: JSON.stringify({
-            chatId: chatId,
-            userId: userId,
-            number: value
-          })
+
+          body:
+            JSON.stringify({
+              chatId:
+                chatId,
+
+              userId:
+                userId,
+
+              number:
+                value
+            })
         }
       );
 
@@ -704,16 +914,18 @@ async function toggleMark(value) {
 }
 
 
-/*
-====================================================
-LOAD GAME
-====================================================
-*/
+/* ==================================================
+   LOAD GAME
+================================================== */
 
 async function loadCard() {
 
-  userId = getUserId();
-  chatId = getGameId();
+  userId =
+    getUserId();
+
+  chatId =
+    getGameId();
+
 
   if (!userId) {
 
@@ -724,6 +936,7 @@ async function loadCard() {
     return;
   }
 
+
   if (!chatId) {
 
     showError(
@@ -733,19 +946,28 @@ async function loadCard() {
     return;
   }
 
+
   try {
 
     const url =
       API_BASE +
       "/api/card?chatId=" +
-      encodeURIComponent(chatId) +
+      encodeURIComponent(
+        chatId
+      ) +
       "&userId=" +
-      encodeURIComponent(userId);
+      encodeURIComponent(
+        userId
+      );
 
     const response =
-      await fetch(url, {
-        cache: "no-store"
-      });
+      await fetch(
+        url,
+        {
+          cache:
+            "no-store"
+        }
+      );
 
     const data =
       await response.json();
@@ -760,41 +982,78 @@ async function loadCard() {
       return;
     }
 
-    cardData = data;
+    cardData =
+      data;
 
-    document.getElementById("playerName").textContent =
-      data.playerName || "Player";
 
-    document.getElementById("hostName").textContent =
-      data.hostName || "Host";
+    document.getElementById(
+      "playerName"
+    ).textContent =
+      data.playerName ||
+      "Player";
 
-    document.getElementById("playerCount").textContent =
-      data.playerCount ?? "0";
+
+    document.getElementById(
+      "hostName"
+    ).textContent =
+      data.hostName ||
+      "Host";
+
+
+    document.getElementById(
+      "playerCount"
+    ).textContent =
+      data.playerCount ??
+      "0";
+
 
     const calledNumbers =
-      Array.isArray(data.calledNumbers)
+      Array.isArray(
+        data.calledNumbers
+      )
         ? data.calledNumbers
         : [];
 
-    document.getElementById("calledCount").textContent =
-      calledNumbers.length + "/75";
 
-    document.getElementById("lastCalled").textContent =
+    document.getElementById(
+      "calledCount"
+    ).textContent =
+      calledNumbers.length +
+      "/75";
+
+
+    document.getElementById(
+      "lastCalled"
+    ).textContent =
       calledNumbers.length
-        ? calledNumbers[calledNumbers.length - 1]
+        ? calledNumbers[
+            calledNumbers.length - 1
+          ]
         : "—";
 
-    renderCalledNumbers(calledNumbers);
+
+    renderCalledNumbers(
+      calledNumbers
+    );
 
     renderBoard();
 
-    document.getElementById("loading").style.display =
+
+    document.getElementById(
+      "loading"
+    ).style.display =
       "none";
 
-    document.getElementById("error").style.display =
+
+    document.getElementById(
+      "error"
+    ).style.display =
       "none";
 
-    document.getElementById("game").style.display =
+
+    document.getElementById(
+      "game"
+    ).style.display =
       "block";
 
   } catch (error) {
@@ -806,67 +1065,93 @@ async function loadCard() {
 }
 
 
-/*
-====================================================
-BINGO
-====================================================
-*/
+/* ==================================================
+   BINGO BUTTON
+================================================== */
 
 document
-  .getElementById("bingoButton")
+  .getElementById(
+    "bingoButton"
+  )
   .addEventListener(
     "click",
     async function() {
 
       const button =
-        document.getElementById("bingoButton");
+        document.getElementById(
+          "bingoButton"
+        );
 
-      button.disabled = true;
-      button.textContent = "Checking...";
+      button.disabled =
+        true;
+
+      button.textContent =
+        "Checking...";
+
 
       try {
 
         const response =
           await fetch(
-            API_BASE + "/api/bingo",
+            API_BASE +
+            "/api/bingo",
             {
               method: "POST",
+
               headers: {
-                "Content-Type": "application/json"
+                "Content-Type":
+                  "application/json"
               },
-              body: JSON.stringify({
-                chatId: chatId,
-                userId: userId
-              })
+
+              body:
+                JSON.stringify({
+                  chatId:
+                    chatId,
+
+                  userId:
+                    userId
+                })
             }
           );
 
+
         const result =
           await response.json();
+
 
         if (response.ok) {
 
           showMessage(
             "🎉 BINGO! " +
-            (result.message || "You have Bingo!")
+            (
+              result.message ||
+              "You have Bingo!"
+            )
           );
+
 
           if (
             tg &&
             tg.HapticFeedback
           ) {
+
             tg.HapticFeedback
-              .notificationOccurred("success");
+              .notificationOccurred(
+                "success"
+              );
           }
 
         } else {
 
           showMessage(
             "❌ " +
-            (result.error || "Not Bingo yet.")
+            (
+              result.error ||
+              "Not Bingo yet."
+            )
           );
-
         }
+
 
       } catch (error) {
 
@@ -876,31 +1161,34 @@ document
 
       }
 
-      button.disabled = false;
-      button.textContent = "🎉 BINGO!";
+
+      button.disabled =
+        false;
+
+      button.textContent =
+        "🎉 BINGO!";
+
     }
   );
 
 
-/*
-====================================================
-START
-====================================================
-*/
+/* ==================================================
+   START
+================================================== */
 
 loadCard();
 
 
-/*
-====================================================
-AUTO REFRESH
-====================================================
-*/
+/* ==================================================
+   AUTO REFRESH
+================================================== */
 
 setInterval(
   loadCard,
   3000
 );
 
-</script></body>
+</script>
+
+</body>
 </html>
