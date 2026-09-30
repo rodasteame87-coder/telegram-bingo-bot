@@ -115,9 +115,6 @@ async function initDatabase() {
   console.log("Initializing database...");
 
 
-  /*
-   * Permanent Bingo cards.
-   */
   await pool.query(`
     CREATE TABLE IF NOT EXISTS bingo_cards (
       card_number INTEGER PRIMARY KEY,
@@ -126,9 +123,6 @@ async function initDatabase() {
   `);
 
 
-  /*
-   * Players.
-   */
   await pool.query(`
     CREATE TABLE IF NOT EXISTS players (
       user_id BIGINT PRIMARY KEY,
@@ -140,29 +134,23 @@ async function initDatabase() {
   `);
 
 
-  /*
-   * IMPORTANT:
-   *
-   * Older database may already have players table
-   * without card_game_id.
-   */
   await pool.query(`
     ALTER TABLE players
     ADD COLUMN IF NOT EXISTS card_game_id BIGINT
   `);
 
 
-  /*
-   * Remove old reservation index.
-   */
+  await pool.query(`
+    ALTER TABLE players
+    ADD COLUMN IF NOT EXISTS marked_numbers JSONB
+  `);
+
+
   await pool.query(`
     DROP INDEX IF EXISTS players_card_number_unique
   `);
 
 
-  /*
-   * One card can only belong to one player.
-   */
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS
     players_card_number_unique
@@ -171,9 +159,6 @@ async function initDatabase() {
   `);
 
 
-  /*
-   * Game state.
-   */
   await pool.query(`
     CREATE TABLE IF NOT EXISTS game_state (
       id INTEGER PRIMARY KEY,
@@ -190,9 +175,6 @@ async function initDatabase() {
   `);
 
 
-  /*
-   * Older database migration.
-   */
   await pool.query(`
     ALTER TABLE game_state
     ADD COLUMN IF NOT EXISTS winner_user_id BIGINT
@@ -209,9 +191,6 @@ async function initDatabase() {
   `);
 
 
-  /*
-   * Create game state if missing.
-   */
   const existing =
     await pool.query(`
       SELECT id
@@ -254,13 +233,8 @@ async function initDatabase() {
 
 
   /*
-   * IMPORTANT CLEANUP:
-   *
-   * Old reservations created by the previous
-   * version had no card_game_id.
-   *
-   * They cannot belong to the current game,
-   * so clear them.
+   * Remove old reservations that do not have
+   * a valid game ID.
    */
   await pool.query(`
     UPDATE players
@@ -268,16 +242,13 @@ async function initDatabase() {
       card_number = NULL,
       card_game_id = NULL,
       marked_numbers = '[]'::jsonb
-    WHERE card_number IS NOT NULL
+    WHERE
+      card_number IS NOT NULL
       AND card_game_id IS NULL
   `);
 
 
-  /*
-   * Generate permanent cards.
-   */
   await generatePermanentCards();
-
 
   console.log("Database ready.");
 }
@@ -691,7 +662,8 @@ async function getGameState() {
         : [],
 
     currentNumber:
-      row.current_number
+      row.current_number !== null &&
+      row.current_number !== undefined
         ? Number(row.current_number)
         : null,
 
@@ -702,7 +674,8 @@ async function getGameState() {
       row.updated_at,
 
     winnerUserId:
-      row.winner_user_id
+      row.winner_user_id !== null &&
+      row.winner_user_id !== undefined
         ? String(row.winner_user_id)
         : null,
 
@@ -710,7 +683,8 @@ async function getGameState() {
       row.winner_name || null,
 
     winnerCardNumber:
-      row.winner_card_number
+      row.winner_card_number !== null &&
+      row.winner_card_number !== undefined
         ? Number(row.winner_card_number)
         : null
   };
@@ -752,9 +726,9 @@ async function startNewGame() {
 
 
     /*
-     * RELEASE ALL CURRENT-GAME CARDS.
+     * Release all player card reservations.
      *
-     * Permanent Bingo boards are NOT touched.
+     * Permanent boards in bingo_cards are NOT changed.
      */
     await client.query(`
       UPDATE players
@@ -841,7 +815,8 @@ async function finishGame(
           id = 1
           AND status = 'playing'
         RETURNING game_id
-      `, [
+      `,
+      [
         winnerUserId,
         winnerName,
         winnerCardNumber
@@ -867,9 +842,6 @@ async function finishGame(
     );
 
 
-    /*
-     * Start a fresh game after 5 seconds.
-     */
     setTimeout(
       async () => {
 
@@ -983,10 +955,6 @@ async function callNextNumber() {
     }
 
 
-    /*
-     * All 75 numbers have been called.
-     * Finish and start a fresh game after 5 seconds.
-     */
     if (available.length === 0) {
 
       const gameId =
@@ -1072,7 +1040,8 @@ async function callNextNumber() {
         current_number = $2,
         updated_at = NOW()
       WHERE id = 1
-    `, [
+    `,
+    [
       JSON.stringify(newCalled),
       number
     ]);
@@ -1134,10 +1103,6 @@ async function automaticCaller() {
     }
 
 
-    /*
-     * Finished games are handled by their
-     * 5-second timer.
-     */
     if (state.status === "finished") {
       return;
     }
@@ -1167,7 +1132,7 @@ function startAutomaticCaller() {
 
 
 /* =========================
-   GET ALL CARDS
+   GET ALL PERMANENT CARDS
 ========================= */
 
 async function getAllCards() {
@@ -1213,9 +1178,10 @@ const server =
           );
 
 
-        /*
-         * HEALTH
-         */
+        /* =====================
+           HEALTH
+        ===================== */
+
         if (
           req.method === "GET" &&
           url.pathname === "/health"
@@ -1241,9 +1207,10 @@ const server =
         }
 
 
-        /*
-         * MINI APP
-         */
+        /* =====================
+           MINI APP
+        ===================== */
+
         if (
           req.method === "GET" &&
           (
@@ -1288,7 +1255,9 @@ const server =
             200,
             {
               "Content-Type":
-                "text/html; charset=utf-8"
+                "text/html; charset=utf-8",
+              "Cache-Control":
+                "no-store, no-cache, must-revalidate"
             }
           );
 
@@ -1299,9 +1268,10 @@ const server =
         }
 
 
-        /*
-         * TELEGRAM WEBHOOK
-         */
+        /* =====================
+           TELEGRAM WEBHOOK
+        ===================== */
+
         if (
           req.method === "POST" &&
           url.pathname === "/telegram-webhook"
@@ -1358,9 +1328,136 @@ const server =
         }
 
 
-        /*
-         * GET CARDS
-         */
+        /* =====================
+           SINGLE CARD
+           
+           NEW ENDPOINT
+        ===================== */
+
+        if (
+          req.method === "GET" &&
+          url.pathname === "/api/card"
+        ) {
+
+          const cardNumber =
+            Number(
+              url.searchParams.get("number")
+            );
+
+
+          if (
+            !Number.isInteger(cardNumber) ||
+            cardNumber < 1 ||
+            cardNumber > 100
+          ) {
+
+            res.writeHead(
+              400,
+              {
+                "Content-Type":
+                  "application/json",
+                "Cache-Control":
+                  "no-store"
+              }
+            );
+
+
+            res.end(
+              JSON.stringify({
+                success: false,
+                message:
+                  "Invalid card number. Choose 1-100."
+              })
+            );
+
+
+            return;
+          }
+
+
+          const result =
+            await pool.query(
+              `
+              SELECT
+                card_number,
+                board
+              FROM bingo_cards
+              WHERE card_number = $1
+              `,
+              [cardNumber]
+            );
+
+
+          if (
+            result.rows.length === 0
+          ) {
+
+            res.writeHead(
+              404,
+              {
+                "Content-Type":
+                  "application/json",
+                "Cache-Control":
+                  "no-store"
+              }
+            );
+
+
+            res.end(
+              JSON.stringify({
+                success: false,
+                message:
+                  `Card #${cardNumber} not found.`
+              })
+            );
+
+
+            return;
+          }
+
+
+          const board =
+            result.rows[0].board;
+
+
+          console.log(
+            `Card endpoint requested: #${cardNumber}`
+          );
+
+
+          res.writeHead(
+            200,
+            {
+              "Content-Type":
+                "application/json",
+              "Cache-Control":
+                "no-store, no-cache, must-revalidate"
+            }
+          );
+
+
+          res.end(
+            JSON.stringify({
+              success: true,
+
+              cardNumber:
+                Number(
+                  result.rows[0].card_number
+                ),
+
+              board
+            })
+          );
+
+
+          return;
+        }
+
+
+        /* =====================
+           GET ALL CARDS
+        ===================== */
+
         if (
           req.method === "GET" &&
           url.pathname === "/api/cards"
@@ -1370,14 +1467,34 @@ const server =
             await getGameState();
 
 
+          if (!state) {
+
+            res.writeHead(
+              500,
+              {
+                "Content-Type":
+                  "application/json"
+              }
+            );
+
+
+            res.end(
+              JSON.stringify({
+                success: false,
+                message:
+                  "Game state unavailable."
+              })
+            );
+
+
+            return;
+          }
+
+
           const cards =
             await getAllCards();
 
 
-          /*
-           * ONLY RESERVATIONS FROM THE
-           * CURRENT GAME ARE USED.
-           */
           const players =
             await pool.query(
               `
@@ -1402,9 +1519,6 @@ const server =
             );
 
 
-          /*
-           * Also tell Mini App who has each card.
-           */
           const usedBy = {};
 
 
@@ -1413,6 +1527,7 @@ const server =
             usedBy[
               String(row.card_number)
             ] = {
+
               userId:
                 String(row.user_id),
 
@@ -1426,13 +1541,18 @@ const server =
             200,
             {
               "Content-Type":
-                "application/json"
+                "application/json",
+              "Cache-Control":
+                "no-store, no-cache, must-revalidate"
             }
           );
 
 
           res.end(
             JSON.stringify({
+
+              success: true,
+
               gameId:
                 state.gameId,
 
@@ -1452,9 +1572,10 @@ const server =
         }
 
 
-        /*
-         * GAME STATE
-         */
+        /* =====================
+           GAME STATE
+        ===================== */
+
         if (
           req.method === "GET" &&
           url.pathname === "/api/game-state"
@@ -1468,7 +1589,9 @@ const server =
             200,
             {
               "Content-Type":
-                "application/json"
+                "application/json",
+              "Cache-Control":
+                "no-store"
             }
           );
 
@@ -1484,9 +1607,10 @@ const server =
         }
 
 
-        /*
-         * MY CARD
-         */
+        /* =====================
+           MY CARD
+        ===================== */
+
         if (
           req.method === "GET" &&
           url.pathname === "/api/my-card"
@@ -1532,6 +1656,30 @@ const server =
             await getGameState();
 
 
+          if (!state) {
+
+            res.writeHead(
+              500,
+              {
+                "Content-Type":
+                  "application/json"
+              }
+            );
+
+
+            res.end(
+              JSON.stringify({
+                success: false,
+                message:
+                  "Game state unavailable."
+              })
+            );
+
+
+            return;
+          }
+
+
           const player =
             await pool.query(
               `
@@ -1561,13 +1709,16 @@ const server =
               200,
               {
                 "Content-Type":
-                  "application/json"
+                  "application/json",
+                "Cache-Control":
+                  "no-store"
               }
             );
 
 
             res.end(
               JSON.stringify({
+                success: true,
                 cardNumber: null,
                 gameId:
                   state.gameId
@@ -1587,7 +1738,9 @@ const server =
             200,
             {
               "Content-Type":
-                "application/json"
+                "application/json",
+              "Cache-Control":
+                "no-store"
             }
           );
 
@@ -1595,13 +1748,11 @@ const server =
           res.end(
             JSON.stringify({
 
+              success: true,
+
               cardNumber:
                 Number(row.card_number),
 
-              /*
-               * Both names are returned so
-               * old/new Mini App versions work.
-               */
               card:
                 row.board,
 
@@ -1623,9 +1774,10 @@ const server =
         }
 
 
-        /*
-         * POST API ROUTES
-         */
+        /* =====================
+           POST API ROUTES
+        ===================== */
+
         if (
           req.method === "POST" &&
           (
@@ -1748,9 +1900,6 @@ const server =
                     );
 
 
-                    /*
-                     * Lock game state.
-                     */
                     const lockedState =
                       await client.query(`
                         SELECT
@@ -1803,8 +1952,8 @@ const server =
 
 
                     /*
-                     * Clean any stale reservations
-                     * from previous games.
+                     * Remove reservations from
+                     * older games.
                      */
                     await client.query(
                       `
@@ -1815,15 +1964,18 @@ const server =
                         marked_numbers = '[]'::jsonb
                       WHERE
                         card_number IS NOT NULL
-                        AND card_game_id <> $1
+                        AND (
+                          card_game_id IS NULL
+                          OR card_game_id <> $1
+                        )
                       `,
                       [gameId]
                     );
 
 
                     /*
-                     * Is this card already used
-                     * in THIS game?
+                     * Check whether selected card
+                     * is already used in this game.
                      */
                     const existingCard =
                       await client.query(
@@ -1861,11 +2013,6 @@ const server =
                       );
 
 
-                      console.log(
-                        `Card #${cardNumber} is already used by ${takenBy} in Game ${gameId}`
-                      );
-
-
                       res.writeHead(
                         409,
                         {
@@ -1896,7 +2043,9 @@ const server =
                     const card =
                       await client.query(
                         `
-                        SELECT board
+                        SELECT
+                          card_number,
+                          board
                         FROM bingo_cards
                         WHERE card_number = $1
                         `,
@@ -1936,8 +2085,8 @@ const server =
 
 
                     /*
-                     * If player already has another
-                     * card in this game, release it.
+                     * Release this user's old card
+                     * from the current game.
                      */
                     await client.query(
                       `
@@ -1958,8 +2107,7 @@ const server =
 
 
                     /*
-                     * Reserve selected card for
-                     * THIS GAME.
+                     * Reserve new card.
                      */
                     await client.query(
                       `
@@ -1992,13 +2140,16 @@ const server =
                       200,
                       {
                         "Content-Type":
-                          "application/json"
+                          "application/json",
+                        "Cache-Control":
+                          "no-store"
                       }
                     );
 
 
                     res.end(
                       JSON.stringify({
+
                         success: true,
 
                         gameId,
@@ -2021,9 +2172,6 @@ const server =
                     );
 
 
-                    /*
-                     * Unique-index race protection.
-                     */
                     if (
                       error.code === "23505"
                     ) {
@@ -2218,11 +2366,14 @@ const server =
                     `
                     UPDATE players
                     SET marked_numbers = $1::jsonb
-                    WHERE user_id = $2
+                    WHERE
+                      user_id = $2
+                      AND card_game_id = $3
                     `,
                     [
                       JSON.stringify(marked),
-                      user.id
+                      user.id,
+                      state.gameId
                     ]
                   );
 
@@ -2351,11 +2502,14 @@ const server =
                     `
                     UPDATE players
                     SET marked_numbers = $1::jsonb
-                    WHERE user_id = $2
+                    WHERE
+                      user_id = $2
+                      AND card_game_id = $3
                     `,
                     [
                       JSON.stringify(marked),
-                      user.id
+                      user.id,
+                      state.gameId
                     ]
                   );
 
@@ -2477,6 +2631,33 @@ const server =
                     player.board;
 
 
+                  if (
+                    !Array.isArray(board) ||
+                    board.length !== 5
+                  ) {
+
+                    res.writeHead(
+                      500,
+                      {
+                        "Content-Type":
+                          "application/json"
+                      }
+                    );
+
+
+                    res.end(
+                      JSON.stringify({
+                        bingo: false,
+                        message:
+                          "The Bingo board is invalid."
+                      })
+                    );
+
+
+                    return;
+                  }
+
+
                   const marked =
                     new Set(
                       (
@@ -2491,9 +2672,6 @@ const server =
                     col
                   ) {
 
-                    /*
-                     * FREE center.
-                     */
                     if (
                       row === 2 &&
                       col === 2
@@ -2515,9 +2693,8 @@ const server =
                   let valid = false;
 
 
-                  /*
-                   * ROWS
-                   */
+                  /* ROWS */
+
                   for (
                     let row = 0;
                     row < 5;
@@ -2555,9 +2732,8 @@ const server =
                   }
 
 
-                  /*
-                   * COLUMNS
-                   */
+                  /* COLUMNS */
+
                   if (!valid) {
 
                     for (
@@ -2598,9 +2774,8 @@ const server =
                   }
 
 
-                  /*
-                   * MAIN DIAGONAL
-                   */
+                  /* MAIN DIAGONAL */
+
                   if (!valid) {
 
                     let complete = true;
@@ -2631,9 +2806,8 @@ const server =
                   }
 
 
-                  /*
-                   * SECOND DIAGONAL
-                   */
+                  /* SECOND DIAGONAL */
+
                   if (!valid) {
 
                     let complete = true;
@@ -2688,20 +2862,25 @@ const server =
                   }
 
 
-                  /*
-                   * VALID BINGO
-                   */
+                  /* VALID BINGO */
+
                   const winnerName =
                     player.name ||
                     user.first_name ||
                     "Player";
 
 
+                  const winnerCardNumber =
+                    Number(
+                      player.card_number
+                    );
+
+
                   const won =
                     await finishGame(
                       user.id,
                       winnerName,
-                      player.card_number
+                      winnerCardNumber
                     );
 
 
@@ -2730,7 +2909,7 @@ const server =
 
 
                   console.log(
-                    `WINNER: ${winnerName} - Card #${player.card_number}`
+                    `WINNER: ${winnerName} - Card #${winnerCardNumber}`
                   );
 
 
@@ -2745,14 +2924,17 @@ const server =
 
                   res.end(
                     JSON.stringify({
+
                       bingo: true,
+
                       gameFinished: true,
+
                       winner: true,
+
                       winnerName,
-                      winnerCardNumber:
-                        Number(
-                          player.card_number
-                        ),
+
+                      winnerCardNumber,
+
                       message:
                         "BINGO! Your winning card is valid."
                     })
@@ -2770,22 +2952,25 @@ const server =
                 );
 
 
-                res.writeHead(
-                  500,
-                  {
-                    "Content-Type":
-                      "application/json"
-                  }
-                );
+                if (!res.headersSent) {
+
+                  res.writeHead(
+                    500,
+                    {
+                      "Content-Type":
+                        "application/json"
+                    }
+                  );
 
 
-                res.end(
-                  JSON.stringify({
-                    success: false,
-                    message:
-                      "Server error."
-                  })
-                );
+                  res.end(
+                    JSON.stringify({
+                      success: false,
+                      message:
+                        "Server error."
+                    })
+                  );
+                }
               }
 
             }
@@ -2796,9 +2981,10 @@ const server =
         }
 
 
-        /*
-         * NOT FOUND
-         */
+        /* =====================
+           NOT FOUND
+        ===================== */
+
         res.writeHead(
           404,
           {
@@ -2822,21 +3008,24 @@ const server =
         );
 
 
-        res.writeHead(
-          500,
-          {
-            "Content-Type":
-              "application/json"
-          }
-        );
+        if (!res.headersSent) {
+
+          res.writeHead(
+            500,
+            {
+              "Content-Type":
+                "application/json"
+            }
+          );
 
 
-        res.end(
-          JSON.stringify({
-            error:
-              "Internal server error"
-          })
-        );
+          res.end(
+            JSON.stringify({
+              error:
+                "Internal server error"
+            })
+          );
+        }
       }
     }
   );
