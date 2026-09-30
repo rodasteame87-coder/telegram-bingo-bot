@@ -20,7 +20,6 @@
 
 body {
   margin: 0;
-  padding: 0;
   font-family: Arial, sans-serif;
   background: #111827;
   color: white;
@@ -86,17 +85,15 @@ h1 {
   font-weight: bold;
   background: #2563eb;
   color: white;
-  cursor: pointer;
 }
 
 .card-number:active {
-  transform: scale(0.95);
+  transform: scale(.95);
 }
 
 .card-number.unavailable {
   background: #4b5563;
   color: #9ca3af;
-  cursor: not-allowed;
 }
 
 .legend {
@@ -129,7 +126,6 @@ h1 {
 .bingo-board th {
   font-size: 18px;
   padding: 7px;
-  text-align: center;
 }
 
 .bingo-board td {
@@ -158,7 +154,6 @@ button.main-button {
   padding: 14px;
   font-size: 17px;
   font-weight: bold;
-  cursor: pointer;
 }
 
 .ok-button {
@@ -242,10 +237,6 @@ button.main-button {
   font-weight: bold;
 }
 
-.bingo-button:disabled {
-  opacity: 0.6;
-}
-
 .result-box {
   border-radius: 14px;
   padding: 20px;
@@ -300,6 +291,8 @@ button.main-button {
 
 <div class="container">
 
+<!-- ================= SELECTION ================= -->
+
 <div id="selectionScreen" class="screen active">
 
 <h1>🎱 BINGO</h1>
@@ -332,16 +325,9 @@ Loading cards...
 🔵 Available &nbsp;&nbsp; ⚫ Already taken
 </div>
 
-<div
-id="previewBox"
-class="preview-box"
-style="display:none;"
->
+<div id="previewBox" class="preview-box" style="display:none;">
 
-<div
-class="preview-title"
-id="previewTitle"
->
+<div class="preview-title" id="previewTitle">
 Card
 </div>
 
@@ -370,23 +356,19 @@ OK
 </div>
 
 
+<!-- ================= GAME ================= -->
+
 <div id="gameScreen" class="screen">
 
 <h1>🎱 BINGO</h1>
 
 <div class="game-info">
 
-<div
-class="game-number"
-id="gameNumber"
->
+<div class="game-number" id="gameNumber">
 Game
 </div>
 
-<div
-class="game-status"
-id="gameStatus"
->
+<div class="game-status" id="gameStatus">
 Game is running
 </div>
 
@@ -398,10 +380,7 @@ Game is running
 CURRENT NUMBER
 </div>
 
-<div
-class="current-number"
-id="currentNumber"
->
+<div class="current-number" id="currentNumber">
 -
 </div>
 
@@ -409,26 +388,17 @@ id="currentNumber"
 Called numbers
 </div>
 
-<div
-class="called-history"
-id="calledHistory"
-></div>
+<div class="called-history" id="calledHistory"></div>
 
 </div>
 
-<div
-class="my-card-title"
-id="myCardTitle"
->
+<div class="my-card-title" id="myCardTitle">
 My Card
 </div>
 
 <div id="gameBoard"></div>
 
-<button
-id="bingoButton"
-class="bingo-button"
->
+<button id="bingoButton" class="bingo-button">
 🏆 BINGO
 </button>
 
@@ -448,10 +418,14 @@ window.Telegram.WebApp
 : null;
 
 if (tg) {
-tg.ready();
-tg.expand();
+  tg.ready();
+  tg.expand();
 }
 
+
+/* =========================
+   VARIABLES
+========================= */
 
 let selectedCardNumber = null;
 let selectedBoard = null;
@@ -465,1656 +439,1489 @@ let markedNumbers = [];
 let currentGameId = null;
 let currentGameStatus = "waiting";
 
-let pollTimer = null;
 let appStarted = false;
 
 
-/* =====================
+/* =========================
    INIT DATA
-===================== */
+========================= */
 
 function getInitData() {
 
-if (!tg) {
-return "";
+  if (!tg) {
+    return "";
+  }
+
+  return tg.initData || "";
+
 }
 
-return tg.initData || "";
 
-}
-
-
-/* =====================
+/* =========================
    API
-===================== */
+========================= */
 
 async function api(url, options = {}) {
 
-const requestOptions = {
-...options,
-cache: "no-store",
-headers: {
-...(options.headers || {}),
-"Content-Type": "application/json",
-"Cache-Control": "no-cache"
-}
-};
+  const requestOptions = {
+    ...options,
+    cache: "no-store",
+    headers: {
+      ...(options.headers || {}),
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache"
+    }
+  };
 
-const response =
-await fetch(url, requestOptions);
+  const response =
+    await fetch(url, requestOptions);
 
-let data;
+  let data;
 
-try {
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error("Invalid server response.");
+  }
 
-data = await response.json();
+  if (!response.ok) {
 
-} catch {
+    throw new Error(
+      data.message ||
+      data.error ||
+      `Server error ${response.status}`
+    );
 
-throw new Error(
-"Invalid server response."
-);
+  }
 
-}
-
-if (!response.ok) {
-
-throw new Error(
-data.message ||
-data.error ||
-`Server error ${response.status}`
-);
-
-}
-
-return data;
+  return data;
 
 }
 
 
-/* =====================
+/* =========================
    HELPERS
-===================== */
+========================= */
 
 function escapeHtml(value) {
 
-return String(value)
-.replace(/&/g, "&amp;")
-.replace(/</g, "&lt;")
-.replace(/>/g, "&gt;")
-.replace(/"/g, "&quot;")
-.replace(/'/g, "&#039;");
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
 }
 
 
 function showError(message) {
 
-document.getElementById(
-"errorBox"
-).innerHTML = `
-<div class="error">
-${escapeHtml(message)}
-</div>
-`;
+  document.getElementById("errorBox").innerHTML = `
+    <div class="error">
+      ${escapeHtml(message)}
+    </div>
+  `;
 
 }
 
 
 function clearError() {
 
-document.getElementById(
-"errorBox"
-).innerHTML = "";
+  document.getElementById("errorBox").innerHTML = "";
 
 }
 
 
 function showScreen(id) {
 
-document
-.querySelectorAll(".screen")
-.forEach(
-screen =>
-screen.classList.remove("active")
-);
+  document
+    .querySelectorAll(".screen")
+    .forEach(
+      screen => screen.classList.remove("active")
+    );
 
-document
-.getElementById(id)
-.classList.add("active");
+  document
+    .getElementById(id)
+    .classList.add("active");
 
 }
 
 
-/* =====================
+/* =========================
    BOARD NORMALIZER
-===================== */
+========================= */
 
 function normalizeBoard(board) {
 
-if (!board) {
-return null;
-}
+  if (!board) {
+    return null;
+  }
 
+  if (typeof board === "string") {
 
-/*
- * Sometimes JSON can arrive as a
- * JSON string. Try to decode it.
- */
+    try {
+      board = JSON.parse(board);
+    } catch {
+      return null;
+    }
 
-if (typeof board === "string") {
+  }
 
-try {
+  if (!Array.isArray(board)) {
+    return null;
+  }
 
-board = JSON.parse(board);
+  if (board.length !== 5) {
+    return null;
+  }
 
-} catch {
+  for (let r = 0; r < 5; r++) {
 
-return null;
+    if (
+      !Array.isArray(board[r]) ||
+      board[r].length !== 5
+    ) {
+      return null;
+    }
 
-}
+  }
 
-}
-
-
-if (!Array.isArray(board)) {
-return null;
-}
-
-if (board.length !== 5) {
-return null;
-}
-
-for (let r = 0; r < 5; r++) {
-
-if (
-!Array.isArray(board[r]) ||
-board[r].length !== 5
-) {
-
-return null;
-
-}
-
-}
-
-return board;
+  return board;
 
 }
 
 
-/* =====================
-   FIND CARD BOARD
-===================== */
-
-function findCardBoard(cards, number) {
-
-const n = String(number);
-
-if (!cards) {
-return null;
-}
-
-
-/*
- * Object format:
- *
- * {
- *   "1": [[...]],
- *   "2": [[...]]
- * }
- */
-
-if (
-typeof cards === "object" &&
-!Array.isArray(cards)
-) {
-
-let item =
-cards[n];
-
-if (!item) {
-item = cards[number];
-}
-
-if (!item) {
-return null;
-}
-
-
-/*
- * Direct board
- */
-
-let board =
-normalizeBoard(item);
-
-if (board) {
-return board;
-}
-
-
-/*
- * Object containing board
- */
-
-if (
-typeof item === "object"
-) {
-
-board =
-normalizeBoard(item.board);
-
-if (board) {
-return board;
-}
-
-board =
-normalizeBoard(item.card);
-
-if (board) {
-return board;
-}
-
-}
-
-}
-
-
-/*
- * Array format.
- */
-
-if (Array.isArray(cards)) {
-
-const item =
-cards.find(
-x =>
-Number(
-x.card_number ??
-x.cardNumber ??
-x.number
-) === Number(number)
-);
-
-if (!item) {
-return null;
-}
-
-return normalizeBoard(
-item.board ??
-item.card
-);
-
-}
-
-return null;
-
-}
-
-
-/* =====================
-   LOAD CARDS
-===================== */
+/* =========================
+   LOAD CARD NUMBERS
+========================= */
 
 async function loadCards() {
 
-clearError();
+  clearError();
 
-const grid =
-document.getElementById(
-"cardsGrid"
-);
+  const grid =
+    document.getElementById("cardsGrid");
 
-grid.innerHTML = `
-<div class="loading">
-Loading cards...
-</div>
-`;
+  grid.innerHTML = `
+    <div class="loading">
+      Loading cards...
+    </div>
+  `;
 
-try {
+  try {
 
-const data =
-await api(
-`/api/cards?_=${Date.now()}`
-);
+    const data =
+      await api(
+        `/api/cards?_=${Date.now()}`
+      );
 
+    currentGameId =
+      Number(data.gameId || 0);
 
-const gameId =
-Number(data.gameId || 0);
+    document.getElementById(
+      "selectionGame"
+    ).textContent =
+      `Game ${currentGameId}`;
 
-currentGameId =
-gameId;
+    document.getElementById(
+      "selectionStatus"
+    ).textContent =
+      data.status === "playing"
+      ? "Choose one available card from 1–100"
+      : "Waiting for the next game...";
 
+    const usedCards =
+      Array.isArray(data.usedCards)
+      ? data.usedCards.map(Number)
+      : [];
 
-document.getElementById(
-"selectionGame"
-).textContent =
-`Game ${gameId}`;
+    const usedBy =
+      data.usedBy || {};
 
+    grid.innerHTML = "";
 
-document.getElementById(
-"selectionStatus"
-).textContent =
-data.status === "playing"
-? "Choose one available card from 1–100"
-: "Waiting for the next game...";
+    for (
+      let number = 1;
+      number <= 100;
+      number++
+    ) {
 
+      const button =
+        document.createElement("button");
 
-const usedCards =
-Array.isArray(data.usedCards)
-? data.usedCards.map(Number)
-: [];
+      button.className = "card-number";
 
+      button.textContent = number;
 
-grid.innerHTML = "";
+      if (
+        usedCards.includes(number)
+      ) {
 
+        button.classList.add("unavailable");
+        button.disabled = true;
 
-/*
- * Always create all 100 buttons.
- */
+        const owner =
+          usedBy[String(number)];
 
-for (
-let number = 1;
-number <= 100;
-number++
-) {
+        if (
+          owner &&
+          owner.name
+        ) {
+          button.title =
+            `Taken by ${owner.name}`;
+        }
 
-const button =
-document.createElement("button");
+      } else {
 
-button.className =
-"card-number";
+        button.addEventListener(
+          "click",
+          () => previewCard(number)
+        );
 
-button.textContent =
-number;
+      }
 
+      grid.appendChild(button);
 
-if (
-usedCards.includes(number)
-) {
+    }
 
-button.classList.add(
-"unavailable"
-);
+  } catch (error) {
 
-button.disabled = true;
+    console.error(
+      "LOAD CARDS ERROR:",
+      error
+    );
 
-} else {
+    grid.innerHTML = "";
 
-button.addEventListener(
-"click",
-function() {
-previewCard(number);
-}
-);
+    showError(
+      error.message ||
+      "Could not load cards."
+    );
 
-}
+    /*
+     * Keep the 1–100 buttons visible.
+     */
 
-grid.appendChild(button);
+    for (
+      let number = 1;
+      number <= 100;
+      number++
+    ) {
 
-}
+      const button =
+        document.createElement("button");
 
-} catch (error) {
+      button.className =
+        "card-number";
 
-console.error(
-"LOAD CARDS ERROR:",
-error
-);
+      button.textContent =
+        number;
 
-grid.innerHTML = "";
+      button.addEventListener(
+        "click",
+        () => previewCard(number)
+      );
 
-showError(
-error.message ||
-"Could not load cards."
-);
+      grid.appendChild(button);
 
+    }
 
-/*
- * Still display 1–100 so the
- * interface does not disappear.
- */
-
-for (
-let number = 1;
-number <= 100;
-number++
-) {
-
-const button =
-document.createElement("button");
-
-button.className =
-"card-number";
-
-button.textContent =
-number;
-
-button.addEventListener(
-"click",
-function() {
-previewCard(number);
-}
-);
-
-grid.appendChild(button);
-
-}
-
-}
+  }
 
 }
 
 
-/* =====================
+/* =========================
+   DIRECT CARD ENDPOINT
+========================= */
+
+async function getCard(number) {
+
+  const data =
+    await api(
+      `/api/card?number=${encodeURIComponent(number)}&_=${Date.now()}`
+    );
+
+  console.log(
+    "DIRECT CARD RESPONSE:",
+    data
+  );
+
+  if (
+    data.success !== true
+  ) {
+
+    throw new Error(
+      data.message ||
+      "Card could not be loaded."
+    );
+
+  }
+
+  const board =
+    normalizeBoard(data.board) ||
+    normalizeBoard(data.card);
+
+  if (!board) {
+
+    console.error(
+      "INVALID BOARD:",
+      data
+    );
+
+    throw new Error(
+      `Card #${number} has an invalid Bingo board.`
+    );
+
+  }
+
+  return {
+    ...data,
+    board
+  };
+
+}
+
+
+/* =========================
    PREVIEW CARD
-===================== */
+========================= */
 
 async function previewCard(number) {
 
-clearError();
+  clearError();
 
-selectedCardNumber = null;
-selectedBoard = null;
+  selectedCardNumber = null;
+  selectedBoard = null;
 
-try {
+  const previewBox =
+    document.getElementById("previewBox");
 
-const data =
-await api(
-`/api/cards?_=${Date.now()}`
-);
+  previewBox.style.display = "block";
 
+  document.getElementById(
+    "previewTitle"
+  ).textContent =
+    `Loading Card #${number}...`;
 
-console.log(
-"Cards response:",
-data
-);
+  document.getElementById(
+    "previewBoard"
+  ).innerHTML = `
+    <div class="loading">
+      Loading Bingo board...
+    </div>
+  `;
 
+  try {
 
-const board =
-findCardBoard(
-data.cards,
-number
-);
+    const data =
+      await getCard(number);
 
+    currentGameId =
+      Number(data.gameId || currentGameId || 0);
 
-if (!board) {
+    /*
+     * Check whether another player
+     * already has this card.
+     */
 
-console.error(
-"Board missing for card:",
-number,
-"Cards:",
-data.cards
-);
+    if (
+      data.available === false
+    ) {
 
-throw new Error(
-`Card #${number} board could not be loaded.`
-);
+      const owner =
+        data.takenBy &&
+        data.takenBy.name;
 
-}
+      throw new Error(
+        owner
+        ? `Card #${number} is already taken by ${owner}.`
+        : `Card #${number} is already taken.`
+      );
 
+    }
 
-const usedCards =
-Array.isArray(data.usedCards)
-? data.usedCards.map(Number)
-: [];
+    selectedCardNumber =
+      Number(
+        data.cardNumber || number
+      );
 
+    selectedBoard =
+      data.board;
 
-if (
-usedCards.includes(Number(number))
-) {
+    document.getElementById(
+      "previewTitle"
+    ).textContent =
+      `Card #${selectedCardNumber}`;
 
-const owner =
-data.usedBy &&
-data.usedBy[String(number)];
+    document.getElementById(
+      "previewBoard"
+    ).innerHTML =
+      createBoardHtml(
+        selectedBoard,
+        false
+      );
 
-throw new Error(
-owner && owner.name
-? `Card #${number} is already taken by ${owner.name}.`
-: `Card #${number} is already taken.`
-);
+    previewBox.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
 
-}
+  } catch (error) {
 
+    console.error(
+      "PREVIEW CARD ERROR:",
+      error
+    );
 
-selectedCardNumber =
-Number(number);
+    previewBox.style.display = "none";
 
-selectedBoard =
-board;
+    showError(
+      error.message ||
+      "Could not load Bingo card."
+    );
 
-
-document.getElementById(
-"previewTitle"
-).textContent =
-`Card #${number}`;
-
-
-document.getElementById(
-"previewBoard"
-).innerHTML =
-createBoardHtml(
-board,
-false
-);
-
-
-document.getElementById(
-"previewBox"
-).style.display =
-"block";
-
-
-document.getElementById(
-"previewBox"
-).scrollIntoView({
-behavior: "smooth",
-block: "start"
-});
-
-} catch (error) {
-
-console.error(
-"PREVIEW CARD ERROR:",
-error
-);
-
-showError(
-error.message ||
-"Could not load Bingo card."
-);
-
-}
+  }
 
 }
 
 
-/* =====================
+/* =========================
    CANCEL
-===================== */
+========================= */
 
 function cancelSelection() {
 
-selectedCardNumber = null;
-selectedBoard = null;
+  selectedCardNumber = null;
+  selectedBoard = null;
 
-document.getElementById(
-"previewBox"
-).style.display =
-"none";
+  document.getElementById(
+    "previewBox"
+  ).style.display = "none";
 
-clearError();
+  clearError();
 
 }
 
 
-/* =====================
+/* =========================
    CONFIRM CARD
-===================== */
+========================= */
 
 async function confirmCard() {
 
-if (
-!selectedCardNumber
-) {
+  if (!selectedCardNumber) {
 
-showError(
-"Please choose a card first."
-);
+    showError(
+      "Please choose a card first."
+    );
 
-return;
+    return;
 
-}
+  }
 
+  const number =
+    Number(selectedCardNumber);
 
-const number =
-Number(selectedCardNumber);
+  const button =
+    document.getElementById(
+      "confirmButton"
+    );
 
-const button =
-document.getElementById(
-"confirmButton"
-);
+  button.disabled = true;
+  button.textContent = "Selecting...";
 
-button.disabled = true;
-button.textContent = "Selecting...";
+  clearError();
 
-clearError();
+  try {
 
-try {
+    const data =
+      await api(
+        "/api/select-card",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            initData:
+              getInitData(),
+            cardNumber:
+              number
+          })
+        }
+      );
 
-const data =
-await api(
-"/api/select-card",
-{
-method: "POST",
-body: JSON.stringify({
+    console.log(
+      "SELECT CARD RESPONSE:",
+      data
+    );
 
-initData:
-getInitData(),
+    if (
+      data.success !== true
+    ) {
 
-cardNumber:
-number
+      throw new Error(
+        data.message ||
+        "Could not select this card."
+      );
 
-})
-}
-);
+    }
 
+    const board =
+      normalizeBoard(data.board) ||
+      normalizeBoard(data.card) ||
+      normalizeBoard(selectedBoard);
 
-console.log(
-"SELECT CARD RESPONSE:",
-data
-);
+    if (!board) {
 
+      throw new Error(
+        "The server selected the card, but the Bingo board was not returned."
+      );
 
-if (
-data.success !== true
-) {
+    }
 
-throw new Error(
-data.message ||
-"Could not select this card."
-);
+    myCardNumber =
+      Number(
+        data.cardNumber || number
+      );
 
-}
+    myBoard =
+      board;
 
+    currentGameId =
+      Number(
+        data.gameId ||
+        currentGameId ||
+        0
+      );
 
-const serverBoard =
-normalizeBoard(
-data.board
-) ||
-normalizeBoard(
-data.card
-);
+    markedNumbers = [];
+    calledNumbers = [];
 
+    selectedCardNumber = null;
+    selectedBoard = null;
 
-const fallbackBoard =
-normalizeBoard(
-selectedBoard
-);
+    document.getElementById(
+      "previewBox"
+    ).style.display = "none";
 
+    document.getElementById(
+      "resultArea"
+    ).innerHTML = "";
 
-myCardNumber =
-Number(
-data.cardNumber ||
-number
-);
+    document.getElementById(
+      "bingoButton"
+    ).style.display = "block";
 
+    document.getElementById(
+      "bingoButton"
+    ).disabled = false;
 
-myBoard =
-serverBoard ||
-fallbackBoard;
+    document.getElementById(
+      "bingoButton"
+    ).textContent =
+      "🏆 BINGO";
 
+    showScreen("gameScreen");
 
-if (!myBoard) {
+    renderMyBoard();
 
-throw new Error(
-"The server selected the card, but no Bingo board was returned."
-);
+    await updateGameState();
 
-}
+  } catch (error) {
 
+    console.error(
+      "CONFIRM CARD ERROR:",
+      error
+    );
 
-currentGameId =
-Number(
-data.gameId ||
-currentGameId ||
-0
-);
+    showError(
+      error.message ||
+      "Could not select Bingo card."
+    );
 
-markedNumbers = [];
-calledNumbers = [];
+    await loadCards();
 
-selectedCardNumber = null;
-selectedBoard = null;
+  } finally {
 
-document.getElementById(
-"previewBox"
-).style.display =
-"none";
+    button.disabled = false;
+    button.textContent = "OK";
 
-document.getElementById(
-"resultArea"
-).innerHTML =
-"";
-
-document.getElementById(
-"bingoButton"
-).style.display =
-"block";
-
-document.getElementById(
-"bingoButton"
-).disabled =
-false;
-
-document.getElementById(
-"bingoButton"
-).textContent =
-"🏆 BINGO";
-
-showScreen(
-"gameScreen"
-);
-
-renderMyBoard();
-
-await updateGameState();
-
-} catch (error) {
-
-console.error(
-"CONFIRM CARD ERROR:",
-error
-);
-
-showError(
-error.message ||
-"Could not select Bingo card."
-);
-
-await loadCards();
-
-} finally {
-
-button.disabled = false;
-button.textContent = "OK";
-
-}
+  }
 
 }
 
 
-/* =====================
+/* =========================
    LOAD MY CARD
-===================== */
+========================= */
 
 async function loadMyCard() {
 
-try {
+  try {
 
-const data =
-await api(
-`/api/my-card?initData=${encodeURIComponent(
-getInitData()
-)}&_=${Date.now()}`
-);
+    const data =
+      await api(
+        `/api/my-card?initData=${encodeURIComponent(getInitData())}&_=${Date.now()}`
+      );
 
+    console.log(
+      "MY CARD RESPONSE:",
+      data
+    );
 
-console.log(
-"MY CARD RESPONSE:",
-data
-);
+    if (
+      !data ||
+      !data.cardNumber
+    ) {
 
+      myCardNumber = null;
+      myBoard = null;
+      markedNumbers = [];
 
-if (
-!data ||
-!data.cardNumber
-) {
+      showScreen(
+        "selectionScreen"
+      );
 
-myCardNumber = null;
-myBoard = null;
-markedNumbers = [];
+      await loadCards();
 
-showScreen(
-"selectionScreen"
-);
+      return;
 
-await loadCards();
+    }
 
-return;
+    const board =
+      normalizeBoard(data.board) ||
+      normalizeBoard(data.card);
 
-}
+    if (!board) {
 
+      console.error(
+        "MY CARD BOARD INVALID:",
+        data
+      );
 
-const board =
-normalizeBoard(data.board) ||
-normalizeBoard(data.card);
+      myCardNumber = null;
+      myBoard = null;
+      markedNumbers = [];
 
+      showScreen(
+        "selectionScreen"
+      );
 
-if (!board) {
+      await loadCards();
 
-console.error(
-"MY CARD HAS NO BOARD:",
-data
-);
+      return;
 
-myCardNumber = null;
-myBoard = null;
-markedNumbers = [];
+    }
 
-showScreen(
-"selectionScreen"
-);
+    myCardNumber =
+      Number(data.cardNumber);
 
-await loadCards();
+    myBoard =
+      board;
 
-return;
+    markedNumbers =
+      Array.isArray(data.markedNumbers)
+      ? data.markedNumbers.map(Number)
+      : [];
 
-}
+    currentGameId =
+      Number(
+        data.gameId ||
+        currentGameId ||
+        0
+      );
 
+    showScreen(
+      "gameScreen"
+    );
 
-myCardNumber =
-Number(data.cardNumber);
+    renderMyBoard();
 
-myBoard =
-board;
+  } catch (error) {
 
-markedNumbers =
-Array.isArray(data.markedNumbers)
-? data.markedNumbers.map(Number)
-: [];
+    console.error(
+      "LOAD MY CARD ERROR:",
+      error
+    );
 
-currentGameId =
-Number(
-data.gameId ||
-currentGameId ||
-0
-);
+    myCardNumber = null;
+    myBoard = null;
+    markedNumbers = [];
 
-showScreen(
-"gameScreen"
-);
+    showScreen(
+      "selectionScreen"
+    );
 
-renderMyBoard();
+    await loadCards();
 
-} catch (error) {
-
-console.error(
-"LOAD MY CARD ERROR:",
-error
-);
-
-myCardNumber = null;
-myBoard = null;
-markedNumbers = [];
-
-showScreen(
-"selectionScreen"
-);
-
-await loadCards();
-
-}
+  }
 
 }
 
 
-/* =====================
+/* =========================
    BOARD HTML
-===================== */
+========================= */
 
 function createBoardHtml(
-board,
-playable
+  board,
+  playable
 ) {
 
-board =
-normalizeBoard(board);
+  board =
+    normalizeBoard(board);
 
-if (!board) {
+  if (!board) {
 
-return `
-<div class="error">
-Could not display Bingo board.
-</div>
-`;
+    return `
+      <div class="error">
+        Could not display Bingo board.
+      </div>
+    `;
+
+  }
+
+  let html = `
+    <table class="bingo-board ${
+      playable ? "play-board" : ""
+    }">
+
+    <thead>
+      <tr>
+        <th>B</th>
+        <th>I</th>
+        <th>N</th>
+        <th>G</th>
+        <th>O</th>
+      </tr>
+    </thead>
+
+    <tbody>
+  `;
+
+  for (
+    let row = 0;
+    row < 5;
+    row++
+  ) {
+
+    html += "<tr>";
+
+    for (
+      let col = 0;
+      col < 5;
+      col++
+    ) {
+
+      const value =
+        board[row][col];
+
+      const free =
+        row === 2 &&
+        col === 2;
+
+      const numeric =
+        Number(value);
+
+      let classes = "";
+
+      if (free) {
+        classes += " free";
+      }
+
+      if (
+        playable &&
+        !free &&
+        Number.isFinite(numeric) &&
+        markedNumbers.includes(numeric)
+      ) {
+
+        classes += " marked";
+
+      } else if (
+        playable &&
+        !free &&
+        Number.isFinite(numeric) &&
+        calledNumbers.includes(numeric)
+      ) {
+
+        classes += " called";
+
+      }
+
+      let click = "";
+
+      if (
+        playable &&
+        !free &&
+        Number.isFinite(numeric)
+      ) {
+
+        click =
+          `onclick="toggleMark(${numeric})"`;
+
+      }
+
+      html += `
+        <td
+          class="${classes.trim()}"
+          ${click}
+        >
+          ${
+            free
+            ? "FREE"
+            : escapeHtml(value)
+          }
+        </td>
+      `;
+
+    }
+
+    html += "</tr>";
+
+  }
+
+  html += `
+    </tbody>
+    </table>
+  `;
+
+  return html;
 
 }
 
 
-let html = `
-<table class="bingo-board ${
-playable ? "play-board" : ""
-}">
-<thead>
-<tr>
-<th>B</th>
-<th>I</th>
-<th>N</th>
-<th>G</th>
-<th>O</th>
-</tr>
-</thead>
-<tbody>
-`;
-
-
-for (
-let row = 0;
-row < 5;
-row++
-) {
-
-html += "<tr>";
-
-for (
-let col = 0;
-col < 5;
-col++
-) {
-
-const value =
-board[row][col];
-
-const free =
-row === 2 &&
-col === 2;
-
-const numeric =
-Number(value);
-
-let classes = "";
-
-if (free) {
-
-classes += " free";
-
-}
-
-if (
-playable &&
-!free &&
-Number.isFinite(numeric) &&
-markedNumbers.includes(numeric)
-) {
-
-classes += " marked";
-
-} else if (
-playable &&
-!free &&
-Number.isFinite(numeric) &&
-calledNumbers.includes(numeric)
-) {
-
-classes += " called";
-
-}
-
-
-let click = "";
-
-if (
-playable &&
-!free &&
-Number.isFinite(numeric)
-) {
-
-click =
-`onclick="toggleMark(${numeric})"`;
-
-}
-
-
-html += `
-<td
-class="${classes.trim()}"
-${click}
->
-${free ? "FREE" : escapeHtml(value)}
-</td>
-`;
-
-}
-
-html += "</tr>";
-
-}
-
-html += `
-</tbody>
-</table>
-`;
-
-return html;
-
-}
-
-
-/* =====================
-   RENDER BOARD
-===================== */
+/* =========================
+   RENDER MY BOARD
+========================= */
 
 function renderMyBoard() {
 
-if (!myBoard) {
-return;
+  if (!myBoard) {
+    return;
+  }
+
+  document.getElementById(
+    "myCardTitle"
+  ).textContent =
+    `My Card #${myCardNumber}`;
+
+  document.getElementById(
+    "gameBoard"
+  ).innerHTML =
+    createBoardHtml(
+      myBoard,
+      true
+    );
+
 }
 
-document.getElementById(
-"myCardTitle"
-).textContent =
-`My Card #${myCardNumber}`;
 
-document.getElementById(
-"gameBoard"
-).innerHTML =
-createBoardHtml(
-myBoard,
-true
-);
-
-}
-
-
-/* =====================
-   MARK
-===================== */
+/* =========================
+   MARK / UNMARK
+========================= */
 
 async function toggleMark(number) {
 
-number = Number(number);
+  number = Number(number);
 
-if (
-currentGameStatus !== "playing"
-) {
-return;
-}
+  if (
+    currentGameStatus !== "playing"
+  ) {
+    return;
+  }
 
-if (
-!calledNumbers.includes(number)
-) {
-return;
-}
+  if (
+    !calledNumbers.includes(number)
+  ) {
+    return;
+  }
 
+  const already =
+    markedNumbers.includes(number);
 
-const already =
-markedNumbers.includes(number);
+  try {
 
+    const endpoint =
+      already
+      ? "/api/unmark"
+      : "/api/mark";
 
-try {
+    const data =
+      await api(
+        endpoint,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            initData:
+              getInitData(),
+            number
+          })
+        }
+      );
 
-const endpoint =
-already
-? "/api/unmark"
-: "/api/mark";
+    if (
+      Array.isArray(
+        data.markedNumbers
+      )
+    ) {
 
+      markedNumbers =
+        data.markedNumbers.map(Number);
 
-const data =
-await api(
-endpoint,
-{
-method: "POST",
-body: JSON.stringify({
+    }
 
-initData:
-getInitData(),
+    renderMyBoard();
 
-number
+  } catch (error) {
 
-})
-}
-);
+    showError(
+      error.message ||
+      "Could not mark number."
+    );
 
-
-if (
-Array.isArray(
-data.markedNumbers
-)
-) {
-
-markedNumbers =
-data.markedNumbers.map(Number);
-
-}
-
-renderMyBoard();
-
-} catch (error) {
-
-showError(
-error.message ||
-"Could not mark number."
-);
-
-}
+  }
 
 }
 
 
-/* =====================
+/* =========================
    BINGO
-===================== */
+========================= */
 
 async function claimBingo() {
 
-if (!myCardNumber) {
+  if (!myCardNumber) {
 
-showError(
-"You have not selected a card."
-);
+    showError(
+      "You have not selected a card."
+    );
 
-return;
+    return;
+
+  }
+
+  if (
+    currentGameStatus !== "playing"
+  ) {
+    return;
+  }
+
+  const button =
+    document.getElementById(
+      "bingoButton"
+    );
+
+  button.disabled = true;
+  button.textContent =
+    "Checking...";
+
+  clearError();
+
+  try {
+
+    const data =
+      await api(
+        "/api/bingo",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            initData:
+              getInitData()
+          })
+        }
+      );
+
+    if (
+      data.bingo === true
+    ) {
+
+      showWinner(
+        data.winnerName || "You",
+        data.winnerCardNumber ||
+        myCardNumber
+      );
+
+      return;
+
+    }
+
+    showError(
+      data.message ||
+      "Bingo is not valid yet."
+    );
+
+    button.disabled = false;
+    button.textContent =
+      "🏆 BINGO";
+
+  } catch (error) {
+
+    showError(
+      error.message ||
+      "Could not check Bingo."
+    );
+
+    button.disabled = false;
+    button.textContent =
+      "🏆 BINGO";
+
+  }
 
 }
 
-if (
-currentGameStatus !== "playing"
-) {
-return;
-}
 
-
-const button =
-document.getElementById(
-"bingoButton"
-);
-
-button.disabled = true;
-button.textContent = "Checking...";
-
-clearError();
-
-try {
-
-const data =
-await api(
-"/api/bingo",
-{
-method: "POST",
-body: JSON.stringify({
-initData:
-getInitData()
-})
-}
-);
-
-
-if (
-data.bingo === true
-) {
-
-showWinner(
-data.winnerName || "You",
-data.winnerCardNumber ||
-myCardNumber
-);
-
-return;
-
-}
-
-
-showError(
-data.message ||
-"Bingo is not valid yet."
-);
-
-button.disabled = false;
-button.textContent = "🏆 BINGO";
-
-} catch (error) {
-
-showError(
-error.message ||
-"Could not check Bingo."
-);
-
-button.disabled = false;
-button.textContent = "🏆 BINGO";
-
-}
-
-}
-
-
-/* =====================
+/* =========================
    WINNER
-===================== */
+========================= */
 
 function showWinner(
-name,
-cardNumber
+  name,
+  cardNumber
 ) {
 
-currentGameStatus =
-"finished";
+  currentGameStatus =
+    "finished";
 
-document.getElementById(
-"gameStatus"
-).textContent =
-"Game finished";
+  document.getElementById(
+    "gameStatus"
+  ).textContent =
+    "Game finished";
 
-document.getElementById(
-"resultArea"
-).innerHTML = `
-<div class="result-box winner-box">
+  document.getElementById(
+    "resultArea"
+  ).innerHTML = `
 
-<div class="result-title">
-🏆 BINGO!
-</div>
+    <div class="result-box winner-box">
 
-<div class="result-text">
+      <div class="result-title">
+        🏆 BINGO!
+      </div>
 
-Winner:
-<strong>
-${escapeHtml(name)}
-</strong>
+      <div class="result-text">
 
-<br>
+        Winner:
+        <strong>
+          ${escapeHtml(name)}
+        </strong>
 
-Winning Card:
-<strong>
-#${escapeHtml(cardNumber)}
-</strong>
+        <br>
 
-<br><br>
+        Winning Card:
+        <strong>
+          #${escapeHtml(cardNumber)}
+        </strong>
 
-🎉 Congratulations!
+        <br><br>
 
-</div>
+        🎉 Congratulations!
 
-</div>
-`;
+      </div>
 
-document.getElementById(
-"bingoButton"
-).style.display =
-"none";
+    </div>
+
+  `;
+
+  document.getElementById(
+    "bingoButton"
+  ).style.display =
+    "none";
 
 }
 
 
-/* =====================
+/* =========================
    GAME OVER
-===================== */
+========================= */
 
 function showGameOver(
-name,
-cardNumber
+  name,
+  cardNumber
 ) {
 
-currentGameStatus =
-"finished";
+  currentGameStatus =
+    "finished";
 
-document.getElementById(
-"gameStatus"
-).textContent =
-"Game finished";
+  document.getElementById(
+    "gameStatus"
+  ).textContent =
+    "Game finished";
 
-document.getElementById(
-"resultArea"
-).innerHTML = `
-<div class="result-box gameover-box">
+  document.getElementById(
+    "resultArea"
+  ).innerHTML = `
 
-<div class="result-title">
-GAME OVER
-</div>
+    <div class="result-box gameover-box">
 
-<div class="result-text">
+      <div class="result-title">
+        GAME OVER
+      </div>
 
-Winner:
-<strong>
-${escapeHtml(name)}
-</strong>
+      <div class="result-text">
 
-<br>
+        Winner:
+        <strong>
+          ${escapeHtml(name)}
+        </strong>
 
-Winning Card:
-<strong>
-#${escapeHtml(cardNumber)}
-</strong>
+        <br>
 
-<br><br>
+        Winning Card:
+        <strong>
+          #${escapeHtml(cardNumber)}
+        </strong>
 
-Better luck next time! 🍀
+        <br><br>
 
-</div>
+        Better luck next time! 🍀
 
-</div>
-`;
+      </div>
 
-document.getElementById(
-"bingoButton"
-).style.display =
-"none";
+    </div>
+
+  `;
+
+  document.getElementById(
+    "bingoButton"
+  ).style.display =
+    "none";
 
 }
 
 
-/* =====================
-   RESET NEW GAME
-===================== */
+/* =========================
+   NEW GAME
+========================= */
 
 async function resetForNewGame(
-gameId
+  gameId
 ) {
 
-currentGameId =
-Number(gameId);
+  currentGameId =
+    Number(gameId);
 
-currentGameStatus =
-"playing";
+  currentGameStatus =
+    "playing";
 
-selectedCardNumber = null;
-selectedBoard = null;
+  selectedCardNumber = null;
+  selectedBoard = null;
 
-myCardNumber = null;
-myBoard = null;
+  myCardNumber = null;
+  myBoard = null;
 
-calledNumbers = [];
-markedNumbers = [];
+  calledNumbers = [];
+  markedNumbers = [];
 
-document.getElementById(
-"currentNumber"
-).textContent = "-";
+  document.getElementById(
+    "currentNumber"
+  ).textContent = "-";
 
-document.getElementById(
-"calledHistory"
-).innerHTML = "";
+  document.getElementById(
+    "calledHistory"
+  ).innerHTML = "";
 
-document.getElementById(
-"gameBoard"
-).innerHTML = "";
+  document.getElementById(
+    "gameBoard"
+  ).innerHTML = "";
 
-document.getElementById(
-"resultArea"
-).innerHTML = "";
+  document.getElementById(
+    "resultArea"
+  ).innerHTML = "";
 
-document.getElementById(
-"bingoButton"
-).style.display =
-"block";
+  document.getElementById(
+    "bingoButton"
+  ).style.display = "block";
 
-document.getElementById(
-"bingoButton"
-).disabled =
-false;
+  document.getElementById(
+    "bingoButton"
+  ).disabled = false;
 
-document.getElementById(
-"bingoButton"
-).textContent =
-"🏆 BINGO";
+  document.getElementById(
+    "bingoButton"
+  ).textContent =
+    "🏆 BINGO";
 
-showScreen(
-"selectionScreen"
-);
+  showScreen(
+    "selectionScreen"
+  );
 
-await loadCards();
+  await loadCards();
 
 }
 
 
-/* =====================
+/* =========================
    GAME STATE
-===================== */
+========================= */
 
 async function updateGameState() {
 
-try {
+  try {
 
-const data =
-await api(
-`/api/game-state?_=${Date.now()}`
-);
+    const data =
+      await api(
+        `/api/game-state?_=${Date.now()}`
+      );
 
+    const newGameId =
+      Number(data.gameId || 0);
 
-const newGameId =
-Number(data.gameId || 0);
+    if (
+      currentGameId === null
+    ) {
 
+      currentGameId =
+        newGameId;
 
-if (
-currentGameId === null
-) {
+    }
 
-currentGameId =
-newGameId;
+    /*
+     * New game detected.
+     */
 
-}
+    if (
+      Number(newGameId) !==
+      Number(currentGameId)
+    ) {
 
+      await resetForNewGame(
+        newGameId
+      );
 
-if (
-Number(newGameId) !==
-Number(currentGameId)
-) {
+      return;
 
-await resetForNewGame(
-newGameId
-);
+    }
 
-return;
+    currentGameStatus =
+      data.status ||
+      "waiting";
 
-}
+    calledNumbers =
+      Array.isArray(
+        data.calledNumbers
+      )
+      ? data.calledNumbers.map(Number)
+      : [];
 
+    document.getElementById(
+      "gameNumber"
+    ).textContent =
+      `Game ${newGameId}`;
 
-currentGameStatus =
-data.status ||
-"waiting";
+    document.getElementById(
+      "selectionGame"
+    ).textContent =
+      `Game ${newGameId}`;
 
+    document.getElementById(
+      "currentNumber"
+    ).textContent =
+      data.currentNumber
+      ? Number(data.currentNumber)
+      : "-";
 
-calledNumbers =
-Array.isArray(
-data.calledNumbers
-)
-? data.calledNumbers.map(Number)
-: [];
+    renderCalledHistory();
 
+    if (
+      data.status === "playing"
+    ) {
 
-document.getElementById(
-"gameNumber"
-).textContent =
-`Game ${newGameId}`;
+      document.getElementById(
+        "gameStatus"
+      ).textContent =
+        "Game is running";
 
-document.getElementById(
-"selectionGame"
-).textContent =
-`Game ${newGameId}`;
+      if (
+        myCardNumber &&
+        myBoard
+      ) {
 
+        showScreen(
+          "gameScreen"
+        );
 
-document.getElementById(
-"currentNumber"
-).textContent =
-data.currentNumber
-? Number(data.currentNumber)
-: "-";
+        renderMyBoard();
 
+      }
 
-renderCalledHistory();
+      return;
 
-
-if (
-data.status === "playing"
-) {
-
-document.getElementById(
-"gameStatus"
-).textContent =
-"Game is running";
-
-if (
-myCardNumber &&
-myBoard
-) {
-
-showScreen(
-"gameScreen"
-);
-
-renderMyBoard();
-
-}
-
-return;
-
-}
+    }
 
 
-if (
-data.status === "finished"
-) {
+    if (
+      data.status === "finished"
+    ) {
 
-const winnerName =
-data.winnerName ||
-"Another player";
+      const winnerName =
+        data.winnerName ||
+        "Another player";
 
-const winnerCard =
-data.winnerCardNumber ||
-"?";
+      const winnerCard =
+        data.winnerCardNumber ||
+        "?";
 
+      if (
+        myCardNumber &&
+        Number(myCardNumber) ===
+        Number(winnerCard)
+      ) {
 
-if (
-myCardNumber &&
-Number(myCardNumber) ===
-Number(winnerCard)
-) {
+        showWinner(
+          winnerName,
+          winnerCard
+        );
 
-showWinner(
-winnerName,
-winnerCard
-);
+      } else {
 
-} else {
+        showGameOver(
+          winnerName,
+          winnerCard
+        );
 
-showGameOver(
-winnerName,
-winnerCard
-);
+      }
 
-}
+    }
 
-}
+  } catch (error) {
 
-} catch (error) {
+    console.log(
+      "GAME STATE ERROR:",
+      error
+    );
 
-console.log(
-"GAME STATE ERROR:",
-error
-);
-
-}
+  }
 
 }
 
 
-/* =====================
+/* =========================
    HISTORY
-===================== */
+========================= */
 
 function renderCalledHistory() {
 
-const history =
-document.getElementById(
-"calledHistory"
-);
+  const history =
+    document.getElementById(
+      "calledHistory"
+    );
 
-history.innerHTML = "";
+  history.innerHTML = "";
 
-[
-...calledNumbers
-].reverse().forEach(
-number => {
+  [
+    ...calledNumbers
+  ]
+  .reverse()
+  .forEach(
+    number => {
 
-const span =
-document.createElement(
-"span"
-);
+      const span =
+        document.createElement(
+          "span"
+        );
 
-span.textContent =
-number;
+      span.textContent =
+        number;
 
-history.appendChild(
-span
-);
+      history.appendChild(
+        span
+      );
+
+    }
+  );
 
 }
-);
-
-}
 
 
-/* =====================
+/* =========================
    POLLING
-===================== */
+========================= */
 
 async function poll() {
 
-await updateGameState();
+  await updateGameState();
 
 }
 
 
-/* =====================
+/* =========================
    START
-===================== */
+========================= */
 
 async function start() {
 
-if (appStarted) {
-return;
-}
+  if (appStarted) {
+    return;
+  }
 
-appStarted = true;
+  appStarted = true;
 
+  try {
 
-try {
+    const state =
+      await api(
+        `/api/game-state?_=${Date.now()}`
+      );
 
-const state =
-await api(
-`/api/game-state?_=${Date.now()}`
-);
+    currentGameId =
+      Number(
+        state.gameId || 0
+      );
 
-currentGameId =
-Number(
-state.gameId || 0
-);
+    currentGameStatus =
+      state.status ||
+      "waiting";
 
-currentGameStatus =
-state.status ||
-"waiting";
+  } catch (error) {
 
-} catch (error) {
+    console.error(
+      "INITIAL STATE ERROR:",
+      error
+    );
 
-console.error(
-"INITIAL STATE ERROR:",
-error
-);
+  }
 
-}
+  await loadMyCard();
 
+  await updateGameState();
 
-await loadMyCard();
-
-await updateGameState();
-
-
-pollTimer =
-setInterval(
-poll,
-1000
-);
+  setInterval(
+    poll,
+    1000
+  );
 
 }
 
 
-/* =====================
+/* =========================
    BUTTONS
-===================== */
+========================= */
 
 document.getElementById(
-"backButton"
+  "backButton"
 ).addEventListener(
-"click",
-cancelSelection
+  "click",
+  cancelSelection
 );
 
 document.getElementById(
-"confirmButton"
+  "confirmButton"
 ).addEventListener(
-"click",
-confirmCard
+  "click",
+  confirmCard
 );
 
 document.getElementById(
-"bingoButton"
+  "bingoButton"
 ).addEventListener(
-"click",
-claimBingo
+  "click",
+  claimBingo
 );
 
 
-/* =====================
+/* =========================
    START APP
-===================== */
+========================= */
 
 start();
 
